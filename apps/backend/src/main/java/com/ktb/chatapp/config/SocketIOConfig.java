@@ -32,6 +32,9 @@ public class SocketIOConfig {
     @Value("${socketio.server.port:5002}")
     private Integer port;
 
+    @Value("${cors.allowed-origins:*}")
+    private String corsAllowedOrigins;
+
     @Bean(initMethod = "start", destroyMethod = "stop")
     public SocketIOServer socketIOServer(AuthTokenListener authTokenListener) {
         com.corundumstudio.socketio.Configuration config = new com.corundumstudio.socketio.Configuration();
@@ -46,7 +49,17 @@ public class SocketIOConfig {
         socketConfig.setTcpReceiveBufferSize(4096);
         config.setSocketConfig(socketConfig);
 
-        config.setOrigin("*");
+        // 환경 변수에서 CORS 허용 Origin 설정
+        if (corsAllowedOrigins != null && !corsAllowedOrigins.equals("*")) {
+            // Socket.IO는 단일 origin만 지원하므로 첫 번째 origin 사용
+            String[] origins = corsAllowedOrigins.split(",");
+            String origin = origins[0].trim();
+            config.setOrigin(origin);
+            log.info("Socket.IO CORS Origin: {}", origin);
+        } else {
+            config.setOrigin("*");
+            log.warn("⚠️  Socket.IO CORS가 모든 Origin을 허용합니다. 보안을 위해 프론트엔드 도메인을 설정하세요.");
+        }
 
         // Socket.IO settings
         config.setPingTimeout(60000);

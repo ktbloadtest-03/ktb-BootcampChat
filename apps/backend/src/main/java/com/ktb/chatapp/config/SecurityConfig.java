@@ -19,6 +19,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.beans.factory.annotation.Value;
 
 @Configuration
 @EnableWebSecurity
@@ -30,7 +31,8 @@ public class SecurityConfig {
     private final CustomBearerTokenResolver bearerTokenResolver;
     private final SessionAwareJwtAuthenticationConverter jwtAuthenticationConverter;
 
-    private static final List<String> CORS_ALLOWED_ORIGINS = List.of("*");
+    @Value("${cors.allowed-origins:*}")
+    private String corsAllowedOrigins;
 
     private static final List<String> CORS_ALLOWED_HEADERS = List.of(
             "Content-Type",
@@ -94,7 +96,11 @@ public class SecurityConfig {
 
     private CorsConfiguration createCorsConfiguration() {
         CorsConfiguration config = new CorsConfiguration();
-        if (CORS_ALLOWED_ORIGINS.contains("*")) {
+        
+        // 환경 변수에서 CORS 허용 Origin 가져오기 (쉼표로 구분)
+        List<String> allowedOrigins = List.of(corsAllowedOrigins.split(","));
+        
+        if (allowedOrigins.contains("*") || corsAllowedOrigins.equals("*")) {
             log.warn("╔═══════════════════════════════════════════════════════════════════════════════╗");
             log.warn("║                           ⚠️  CORS 보안 경고  ⚠️                              ║");
             log.warn("╠═══════════════════════════════════════════════════════════════════════════════╣");
@@ -104,10 +110,13 @@ public class SecurityConfig {
             log.warn("║  🔓 예상하지 못한 도메인에서의 요청도 수용됩니다:                           ║");
             log.warn("║     예시) https://a-team-front.com → https://b-team-backend.com             ║");
             log.warn("║                                                                               ║");
-            log.warn("║  💡 팀 도메인으로 CORS 설정하세요.         ║");
+            log.warn("║  💡 환경 변수 cors.allowed-origins에 프론트엔드 도메인을 설정하세요.         ║");
             log.warn("╚═══════════════════════════════════════════════════════════════════════════════╝");
+        } else {
+            log.info("✅ CORS 허용 Origin: {}", allowedOrigins);
         }
-        config.setAllowedOriginPatterns(CORS_ALLOWED_ORIGINS);
+        
+        config.setAllowedOriginPatterns(allowedOrigins);
         config.setAllowedMethods(CORS_ALLOWED_METHODS);
         config.setAllowedHeaders(CORS_ALLOWED_HEADERS);
         config.setExposedHeaders(CORS_EXPOSED_HEADERS);

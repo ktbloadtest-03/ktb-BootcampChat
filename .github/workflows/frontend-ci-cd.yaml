@@ -1,0 +1,138 @@
+name: Frontend CI/CD
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/frontend/**'
+      - '.github/workflows/frontend-ci-cd.yaml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'apps/frontend/**'
+      - '.github/workflows/frontend-ci-cd.yaml'
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: apps/frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/frontend
+        run: npm ci
+
+      - name: Build Next.js application
+        working-directory: apps/frontend
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.BACKEND_API_URL }}
+          NEXT_PUBLIC_SOCKET_URL: ${{ secrets.BACKEND_SOCKET_URL }}
+        run: |
+          echo "🔨 Building Next.js application..."
+          echo "API URL: $NEXT_PUBLIC_API_URL"
+          echo "Socket URL: $NEXT_PUBLIC_SOCKET_URL"
+          npm run build:production
+
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
+
+      - name: Add server to known hosts
+        run: |
+          ssh-keyscan -H ${{ secrets.SERVER_HOST_FE }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to server
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST_FE }} << 'EOF'
+            set -e
+            
+            DEPLOY_PATH="/home/ubuntu/ktb-chat-frontend"
+            
+            echo "=========================================="
+            echo "  Frontend Deployment"
+            echo "=========================================="
+            
+            # 배포 디렉토리 생성
+            echo "📁 Creating deployment directory..."
+            mkdir -p ${DEPLOY_PATH}
+            mkdir -p ${DEPLOY_PATH}/.next
+            
+            # 기존 프로세스 백업 (롤백을 위해)
+            if [ -f "${DEPLOY_PATH}/server.pid" ]; then
+              OLD_PID=$(cat ${DEPLOY_PATH}/server.pid)
+              if ps -p $OLD_PID > /dev/null 2>&1; then
+                echo "📦 Backing up old process..."
+                # 프로세스는 나중에 정리
+              fi
+            fi
+          EOF
+          
+          # 빌드 결과물 전송
+          echo "📤 Uploading build artifacts..."
+          rsync -avz --delete \
+            --exclude='*.log' \
+            --exclude='.env*' \
+            --exclude='server.pid' \
+            --exclude='package.json' \
+            apps/frontend/.next/standalone/ \
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST_FE }}:/home/ubuntu/ktb-chat-frontend/
+          
+          rsync -avz --delete \
+            apps/frontend/.next/static \
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST_FE }}:/home/ubuntu/ktb-chat-frontend/.next/
+          
+          rsync -avz --delete \
+            apps/frontend/public \
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST_FE }}:/home/ubuntu/ktb-chat-frontend/
+          
+          rsync -avz \
+            apps/frontend/restart.sh \
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST_FE }}:/home/ubuntu/ktb-chat-frontend/
+          
+          # 서버에서 재시작
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST_FE }} << 'EOF'
+            set -e
+            
+            DEPLOY_PATH="/home/ubuntu/ktb-chat-frontend"
+            
+            echo "🔄 Restarting frontend server..."
+            cd ${DEPLOY_PATH}
+            chmod +x restart.sh
+            ./restart.sh
+            
+            # 서버 상태 확인
+            echo "⏳ Waiting for server to start..."
+            sleep 5
+            
+            if [ -f "${DEPLOY_PATH}/server.pid" ]; then
+              PID=$(cat ${DEPLOY_PATH}/server.pid)
+              if ps -p $PID > /dev/null 2>&1; then
+                echo "✅ Frontend server is running (PID: $PID)"
+              else
+                echo "❌ Frontend server failed to start"
+                exit 1
+              fi
+            else
+              echo "⚠️  PID file not found, but deployment completed"
+            fi
+            
+            echo "=========================================="
+            echo "✅ Frontend deployment completed!"
+            echo "=========================================="
+          EOF
+
