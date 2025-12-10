@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-#      - develop
+      - develop
     paths:
       - 'apps/backend/**'
       - '.github/workflows/backend-ci-cd.yaml'
