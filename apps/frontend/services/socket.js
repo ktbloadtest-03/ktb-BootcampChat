@@ -60,7 +60,8 @@ class SocketService {
           reconnectionDelay: this.retryDelay,
           reconnectionDelayMax: 5000,
           timeout: 20000,
-          forceNew: true
+          forceNew: true,
+          path: "/",
         });
 
         this.setupEventHandlers(resolve, reject);
