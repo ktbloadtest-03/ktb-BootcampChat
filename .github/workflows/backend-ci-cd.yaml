@@ -68,7 +68,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}
+          images: ${{ secrets.DOCKER_USERNAME }}/ktb-chat-backend:latest
           tags: |
             type=ref,event=branch
             type=sha,prefix={{branch}}-
@@ -81,8 +81,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:buildcache
-          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:buildcache,mode=max
+          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/ktb-chat-backend:latest:buildcache
+          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/ktb-chat-backend:latest:buildcache,mode=max
 
   deploy:
     name: Deploy to Server
@@ -103,38 +103,9 @@ jobs:
         run: |
           ssh-keyscan -H ${{ secrets.SERVER_HOST_BE }} >> ~/.ssh/known_hosts
 
-      - name: Check if Docker is installed
-        id: check-docker
-        run: |
-          DOCKER_EXISTS=$(ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST_BE }} 'command -v docker >/dev/null && echo "true" || echo "false"')
-          echo "docker_exists=$DOCKER_EXISTS" >> $GITHUB_OUTPUT
-
-      - name: Install Docker on EC2
-        if: steps.check-docker.outputs.docker_exists == 'false'
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST_BE }} << 'EOF'
-            sudo apt-get update
-            sudo apt-get install -y \
-              ca-certificates \
-              curl \
-              gnupg \
-              lsb-release
-            sudo mkdir -p /etc/apt/keyrings
-            curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-              | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-            echo \
-              "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-              https://download.docker.com/linux/ubuntu \
-              $(lsb_release -cs) stable" \
-              | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-            sudo apt-get update
-            sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-            sudo usermod -aG docker $USER
-          EOF
-
       - name: Deploy to server
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST_BE }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST_BE }} << EOF
             set -e
             
             # Docker 이미지 태그 결정
@@ -144,15 +115,42 @@ jobs:
               IMAGE_TAG="develop-${{ github.sha }}"
             fi
             
-            IMAGE_NAME="${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${IMAGE_TAG}"
+            IMAGE_NAME="${{ secrets.DOCKER_USERNAME }}/ktb-chat-backend:\${IMAGE_TAG}"
             
             echo "=========================================="
             echo "  Deploying: ${IMAGE_NAME}"
             echo "=========================================="
             
-            # Docker 이미지 pull
-            echo "📥 Pulling Docker image..."
-            docker pull ${IMAGE_NAME}
+            # Docker Hub 로그인 (비공개 레포지토리인 경우 필요)
+            echo "🔐 Logging in to Docker Hub..."
+            echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin || true
+            
+            # Docker 이미지 pull (재시도 로직 포함)
+            echo "📥 Pulling Docker image: \${IMAGE_NAME}"
+            MAX_RETRIES=3
+            RETRY_COUNT=0
+            PULL_SUCCESS=false
+            
+            while [ \$RETRY_COUNT -lt \$MAX_RETRIES ]; do
+              if docker pull \${IMAGE_NAME}; then
+                PULL_SUCCESS=true
+                echo "✅ Image pulled successfully!"
+                break
+              else
+                RETRY_COUNT=\$((RETRY_COUNT + 1))
+                if [ \$RETRY_COUNT -lt \$MAX_RETRIES ]; then
+                  echo "⏳ Pull failed, retrying in 20 seconds... (\${RETRY_COUNT}/\${MAX_RETRIES})"
+                  sleep 20
+                fi
+              fi
+            done
+            
+            if [ "\$PULL_SUCCESS" = false ]; then
+              echo "❌ Failed to pull image after \${MAX_RETRIES} attempts"
+              echo "Image: \${IMAGE_NAME}"
+              echo "Please check if build-and-push job completed successfully"
+              exit 1
+            fi
             
             # 기존 컨테이너 백업 (롤백을 위해)
             OLD_CONTAINER=$(docker ps -a --filter "name=ktb-chat-backend" --format "{{.ID}}" | head -1)
@@ -168,19 +166,11 @@ jobs:
             
             # 새 컨테이너 실행
             echo "🚀 Starting new container..."
-            # CORS 환경 변수 설정 (프론트엔드 도메인)
-            CORS_ENV=""
-            if [ -n "${{ secrets.FRONTEND_URL }}" ]; then
-              CORS_ENV="-e CORS_ALLOWED_ORIGINS=${{ secrets.FRONTEND_URL }}"
-              echo "🌐 CORS 설정: ${{ secrets.FRONTEND_URL }}"
-            fi
-            
             docker run -d \
               --name ktb-chat-backend \
               --restart unless-stopped \
               -p 5001:5001 \
               -p 5002:5002 \
-              ${CORS_ENV} \
               ${IMAGE_NAME}
             
             # 컨테이너 상태 확인
@@ -229,3 +219,4 @@ jobs:
               exit 1
             fi
           EOF
+
