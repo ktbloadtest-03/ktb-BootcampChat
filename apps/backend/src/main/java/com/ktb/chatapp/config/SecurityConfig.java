@@ -70,7 +70,7 @@ public class SecurityConfig {
                                 "/api/auth/**",
                                 "/api/v3/api-docs/**",
                                 "/api/swagger-ui/**",
-                                "/api/swagger-ui.html",
+                                "/api/swagger-ui.html", "/api/rooms/**",
                                 "/api/docs/**"
                         ).permitAll()
                         .requestMatchers("/api/**").authenticated()

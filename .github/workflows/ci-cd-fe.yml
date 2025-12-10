@@ -3,7 +3,7 @@ name: FE CI/CD
 on:
   push:
     branches:
-      - main
+      - feat/test-branch
 
 jobs:
   build-and-push:
