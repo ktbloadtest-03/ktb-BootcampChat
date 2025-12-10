@@ -180,6 +180,7 @@ jobs:
           
             # JWT 시크릿 환경 변수 설정
             JWT_ENV="d7689060b5bc059a5661401c72f820614ed942d15e4aa928b633e60f1e17cef9"
+            MONGO_ENV="mongodb://43.203.48.10:27017/bootcamp-chat"
           
             # 새 컨테이너 실행
             echo "🚀 Starting new container..."
@@ -190,6 +191,7 @@ jobs:
               -p 5002:5002 \
               ${CORS_ENV} \
               -e JWT_SECRET=${JWT_ENV} \
+              -e MONGO_URI=${MONGO_ENV} \
               ${IMAGE_NAME}
           
             # 컨테이너 상태 확인
