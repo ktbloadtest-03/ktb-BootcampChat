@@ -68,7 +68,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ secrets.DOCKER_USERNAME }}/ktb-chat-backend:latest
+          images: ${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}
           tags: |
             type=ref,event=branch
             type=sha,prefix={{branch}}-
@@ -81,8 +81,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/ktb-chat-backend:latest:buildcache
-          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/ktb-chat-backend:latest:buildcache,mode=max
+          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:buildcache,mode=max
 
   deploy:
     name: Deploy to Server
@@ -107,30 +107,30 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST_BE }} << EOF
             set -e
-            
+          
             # Docker 이미지 태그 결정
             if [ "${{ github.ref }}" == "refs/heads/main" ]; then
               IMAGE_TAG="main-${{ github.sha }}"
             else
               IMAGE_TAG="develop-${{ github.sha }}"
             fi
-            
+          
             IMAGE_NAME="${{ secrets.DOCKER_USERNAME }}/ktb-chat-backend:\${IMAGE_TAG}"
-            
+          
             echo "=========================================="
             echo "  Deploying: ${IMAGE_NAME}"
             echo "=========================================="
-            
+          
             # Docker Hub 로그인 (비공개 레포지토리인 경우 필요)
             echo "🔐 Logging in to Docker Hub..."
             echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin || true
-            
+          
             # Docker 이미지 pull (재시도 로직 포함)
             echo "📥 Pulling Docker image: \${IMAGE_NAME}"
             MAX_RETRIES=3
             RETRY_COUNT=0
             PULL_SUCCESS=false
-            
+          
             while [ \$RETRY_COUNT -lt \$MAX_RETRIES ]; do
               if docker pull \${IMAGE_NAME}; then
                 PULL_SUCCESS=true
@@ -144,26 +144,26 @@ jobs:
                 fi
               fi
             done
-            
+          
             if [ "\$PULL_SUCCESS" = false ]; then
               echo "❌ Failed to pull image after \${MAX_RETRIES} attempts"
               echo "Image: \${IMAGE_NAME}"
               echo "Please check if build-and-push job completed successfully"
               exit 1
             fi
-            
+          
             # 기존 컨테이너 백업 (롤백을 위해)
             OLD_CONTAINER=$(docker ps -a --filter "name=ktb-chat-backend" --format "{{.ID}}" | head -1)
             if [ -n "$OLD_CONTAINER" ]; then
               echo "📦 Backing up old container..."
               docker rename ktb-chat-backend ktb-chat-backend-backup-$(date +%s) 2>/dev/null || true
             fi
-            
+          
             # 기존 컨테이너 중지 및 제거
             echo "🛑 Stopping existing containers..."
             docker stop ktb-chat-backend 2>/dev/null || true
             docker rm ktb-chat-backend 2>/dev/null || true
-            
+          
             # 새 컨테이너 실행
             echo "🚀 Starting new container..."
             docker run -d \
@@ -172,23 +172,23 @@ jobs:
               -p 5001:5001 \
               -p 5002:5002 \
               ${IMAGE_NAME}
-            
+          
             # 컨테이너 상태 확인
             echo "⏳ Waiting for container to start..."
             sleep 5
-            
+          
             if ! docker ps | grep -q ktb-chat-backend; then
               echo "❌ Container failed to start"
               docker logs ktb-chat-backend 2>/dev/null || true
               exit 1
             fi
-            
+          
             # 헬스체크 (최대 60초 대기)
             echo "🏥 Performing health check..."
             MAX_WAIT=60
             ELAPSED=0
             HEALTHY=false
-            
+          
             while [ $ELAPSED -lt $MAX_WAIT ]; do
               if curl -sf http://localhost:5001/api/health > /dev/null 2>&1; then
                 HEALTHY=true
@@ -199,16 +199,16 @@ jobs:
               echo -n "."
             done
             echo ""
-            
+          
             if [ "$HEALTHY" = true ]; then
               echo "✅ Health check passed!"
-              
+          
               # 오래된 백업 컨테이너 정리 (최근 3개만 유지)
               echo "🧹 Cleaning up old backup containers..."
               docker ps -a --filter "name=ktb-chat-backend-backup" --format "{{.ID}} {{.CreatedAt}}" | \
                 sort -k2 -r | tail -n +4 | cut -d' ' -f1 | \
                 xargs -r docker rm -f 2>/dev/null || true
-              
+          
               echo "=========================================="
               echo "✅ Deployment completed successfully!"
               echo "=========================================="
