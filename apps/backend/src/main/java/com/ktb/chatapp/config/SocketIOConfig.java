@@ -82,36 +82,5 @@ public class SocketIOConfig {
     public ChatDataStore chatDataStore() {
         return new LocalChatDataStore();
     }
-    
-    /**
-     * Socket.IO 서버의 내부 Netty 서버에 헬스 체크 핸들러를 추가합니다.
-     * 리플렉션을 사용하여 내부 구조에 접근합니다.
-     */
-    private void addHealthCheckHandler(SocketIOServer socketIOServer) {
-        try {
-            // SocketIOServer의 내부 bootstrap 필드에 접근
-            Field bootstrapField = socketIOServer.getClass().getDeclaredField("bootstrap");
-            bootstrapField.setAccessible(true);
-            ServerBootstrap bootstrap = (ServerBootstrap) bootstrapField.get(socketIOServer);
-            
-            // Bootstrap의 childHandler에 헬스 체크 핸들러 추가
-            if (bootstrap != null) {
-                bootstrap.childHandler(new io.netty.channel.ChannelInitializer<io.netty.channel.socket.SocketChannel>() {
-                    @Override
-                    protected void initChannel(io.netty.channel.socket.SocketChannel ch) throws Exception {
-                        ChannelPipeline pipeline = ch.pipeline();
-                        // 기존 핸들러들 앞에 헬스 체크 핸들러 추가
-                        pipeline.addFirst("healthCheck", new SocketIOHealthCheckHandler());
-                    }
-                });
-                log.info("Health check handler added to Socket.IO server");
-            }
-        } catch (NoSuchFieldException e) {
-            log.warn("Could not find bootstrap field in SocketIOServer, trying alternative approach", e);
-            // 대안: Socket.IO 서버가 시작된 후 ChannelPipeline에 직접 추가
-            // 이 방법은 서버가 시작된 후에만 가능하므로 별도의 초기화 로직이 필요할 수 있습니다.
-        } catch (Exception e) {
-            log.warn("Failed to add health check handler", e);
-        }
-    }
+
 }
