@@ -190,7 +190,7 @@ jobs:
               -p 5001:5001 \
               -p 5002:5002 \
               -e "socketio.server.host=0.0.0.0" \
-              -e "socketio.server.port=5002"
+              -e "socketio.server.port=5002" \
               ${CORS_ENV} \
               -e JWT_SECRET=${JWT_ENV} \
               -e MONGO_URI=${MONGO_ENV} \
