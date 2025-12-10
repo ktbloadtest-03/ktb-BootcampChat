@@ -189,7 +189,7 @@ jobs:
               -p 5001:5001 \
               -p 5002:5002 \
               ${CORS_ENV} \
-              ${JWT_ENV} \
+              -e JWT_SECRET=${JWT_ENV} \
               ${IMAGE_NAME}
           
             # 컨테이너 상태 확인
