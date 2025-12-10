@@ -82,4 +82,5 @@ public class SocketIOConfig {
     public ChatDataStore chatDataStore() {
         return new LocalChatDataStore();
     }
+
 }
