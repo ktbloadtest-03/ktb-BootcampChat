@@ -1,4 +1,4 @@
-const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+const BASE_URL = process.env.BASE_URL || "http://localhost:3000";
 
 /**
  * 프로필 페이지로 이동 액션
@@ -15,7 +15,7 @@ async function goToProfileAction(page) {
  */
 async function changeProfileImageAction(page, imagePath) {
   await goToProfileAction(page);
-  await page.getByTestId('profile-image-file-input').setInputFiles(imagePath);
+  await page.getByTestId("profile-image-file-input").setInputFiles(imagePath);
 }
 
 /**
@@ -24,7 +24,7 @@ async function changeProfileImageAction(page, imagePath) {
  */
 async function deleteProfileImageAction(page) {
   await goToProfileAction(page);
-  await page.getByTestId('profile-image-delete-button').click();
+  await page.getByTestId("profile-image-delete-button").click();
 }
 
 /**
@@ -36,10 +36,10 @@ async function updateProfileAction(page, profileData) {
   await goToProfileAction(page);
 
   if (profileData.name) {
-    await page.getByTestId('profile-name-input').fill(profileData.name);
+    await page.getByTestId("profile-name-input").fill(profileData.name);
   }
 
-  await page.getByTestId('profile-save-button').click();
+  await page.getByTestId("profile-save-button").click();
 }
 
 module.exports = {
