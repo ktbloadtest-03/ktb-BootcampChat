@@ -267,8 +267,19 @@ jobs:
             MONGO_ENV="mongodb://43.203.48.10:27017/bootcamp-chat"
             REDIS_IP="43.200.29.6"
             REDIS_PORT="6379"
-          
-            echo "🚀 Starting new container..."
+            
+            # EC2 Public IP (IMDSv2)
+            TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" \
+              -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+              
+            SERVER_PUBLIC_IP=$(curl -s \
+              -H "X-aws-ec2-metadata-token: ${TOKEN}" \
+              http://169.254.169.254/latest/meta-data/public-ipv4)
+              
+            echo "SERVER_PUBLIC_IP=${SERVER_PUBLIC_IP}"
+
+
+          echo "🚀 Starting new container..."
             docker run -d \
             --name ktb-chat-backend \
             --restart unless-stopped \
@@ -276,6 +287,7 @@ jobs:
             -p 5002:5002 \
             -e "socketio.server.host=0.0.0.0" \
             -e "socketio.server.port=5002" \
+            -e SERVER_IP=${SERVER_PUBLIC_IP} \
             ${CORS_ENV} \
             -e JWT_SECRET=${JWT_ENV} \
             -e MONGO_URI=${MONGO_ENV} \
