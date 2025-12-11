@@ -4,7 +4,6 @@ import com.corundumstudio.socketio.SocketIOClient;
 import com.corundumstudio.socketio.SocketIOServer;
 import com.corundumstudio.socketio.annotation.OnEvent;
 import com.ktb.chatapp.cache.IpCacheStore;
-import com.ktb.chatapp.cache.IpExtractor;
 import com.ktb.chatapp.cache.RoomCacheStore;
 import com.ktb.chatapp.dto.FetchMessagesRequest;
 import com.ktb.chatapp.dto.FetchMessagesResponse;
@@ -18,6 +17,8 @@ import com.ktb.chatapp.repository.RoomRepository;
 import com.ktb.chatapp.repository.UserRepository;
 import com.ktb.chatapp.websocket.socketio.SocketUser;
 import com.ktb.chatapp.websocket.socketio.UserRooms;
+
+import java.net.InetSocketAddress;
 import java.time.LocalDateTime;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
@@ -73,7 +74,12 @@ public class RoomJoinHandler {
             if (userRooms.isInRoom(userId, roomId)) {
                 log.debug("User {} already in room {}", userId, roomId);
                 client.joinRoom(roomId);
-                String userIp = ipCacheStore.getIp(userId);
+
+                InetSocketAddress remoteAddress = (InetSocketAddress) client.getRemoteAddress();
+                if(remoteAddress != null) {
+                    String ip = remoteAddress.getAddress().getHostAddress();
+                    ipCacheStore.saveIp(userId, ip);
+                }
 
                 client.sendEvent(JOIN_ROOM_SUCCESS, Map.of("roomId", roomId));
                 return;
@@ -87,7 +93,11 @@ public class RoomJoinHandler {
             // Join socket room and add to user's room set
             client.joinRoom(roomId);
             userRooms.add(userId, roomId);
-            String userIp = ipCacheStore.getIp(userId);
+            InetSocketAddress remoteAddress = (InetSocketAddress) client.getRemoteAddress();
+            if(remoteAddress != null) {
+                String ip = remoteAddress.getAddress().getHostAddress();
+                ipCacheStore.saveIp(userId, ip);
+            }
 
             Message joinMessage = Message.builder()
                 .roomId(roomId)

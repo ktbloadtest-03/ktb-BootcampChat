@@ -1,20 +1,23 @@
 package com.ktb.chatapp.cache;
 
-import com.ktb.chatapp.model.Room;
-import com.ktb.chatapp.repository.RoomRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
 public class IpCacheStore {
-    private final IpExtractor ipExtractor;
+
+    @CachePut(value= "userIp", key= "#userId", cacheManager = "cacheManager" )
+    public String saveIp(String userId, String ip) {
+        return ip;
+    }
 
     @Cacheable(value = "userIp", key="#userId", cacheManager = "cacheManager")
     public String getIp(String userId) {
-        return ipExtractor.getIpFromHeader();
+        return "retry";
     }
 
     @CacheEvict(cacheNames = "userIp", key = "#userId", cacheManager = "cacheManager")
