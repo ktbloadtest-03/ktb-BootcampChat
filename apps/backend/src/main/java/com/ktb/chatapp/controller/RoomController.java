@@ -166,7 +166,7 @@ public class RoomController {
             }
 
             Room savedRoom = roomService.createRoom(createRoomRequest, principal.getName());
-            RoomResponse roomResponse = mapToRoomResponse(savedRoom, principal.getName());
+            RoomResponse roomResponse = mapToRoomResponse(savedRoom, principal.getName(), false);
 
             return ResponseEntity.status(201).body(
                 Map.of(
@@ -212,7 +212,7 @@ public class RoomController {
             }
 
             Room room = roomOpt.get();
-            RoomResponse roomResponse = mapToRoomResponse(room, principal.getName());
+            RoomResponse roomResponse = mapToRoomResponse(room, principal.getName(), true);
 
             return ResponseEntity.ok(
                 Map.of(
@@ -256,7 +256,7 @@ public class RoomController {
                         .body(StandardResponse.error("채팅방을 찾을 수 없습니다."));
             }
 
-            RoomResponse roomResponse = mapToRoomResponse(joinedRoom, principal.getName());
+            RoomResponse roomResponse = mapToRoomResponse(joinedRoom, principal.getName(), false);
             
             return ResponseEntity.ok(
                 Map.of(
@@ -281,7 +281,7 @@ public class RoomController {
         }
     }
 
-    private RoomResponse mapToRoomResponse(Room room, String name) {
+    private RoomResponse mapToRoomResponse(Room room, String name, boolean recent) {
         User creator = userRepository.findById(room.getCreator()).orElse(null);
         if (creator == null) {
             throw new RuntimeException("Creator not found for room " + room.getId());
@@ -303,7 +303,7 @@ public class RoomController {
 
         // 최근 10분간 메시지 수 조회
         LocalDateTime tenMinutesAgo = LocalDateTime.now().minusMinutes(10);
-        long recentMessageCount = messageRepository.countRecentMessagesByRoomId(room.getId(), tenMinutesAgo);
+        long recentMessageCount = recent ? messageRepository.countRecentMessagesByRoomId(room.getId(), tenMinutesAgo) : 0;
 
         return RoomResponse.builder()
                 .id(room.getId())
