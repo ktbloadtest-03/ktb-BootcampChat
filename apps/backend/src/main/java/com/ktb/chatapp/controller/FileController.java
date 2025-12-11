@@ -1,5 +1,6 @@
 package com.ktb.chatapp.controller;
 
+import com.ktb.chatapp.cache.UserCacheStore;
 import com.ktb.chatapp.dto.StandardResponse;
 import com.ktb.chatapp.model.File;
 import com.ktb.chatapp.model.User;
@@ -15,11 +16,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.security.Principal;
-import java.util.HashMap;
-import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
@@ -29,6 +25,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.security.Principal;
+import java.util.HashMap;
+import java.util.Map;
 
 @Tag(name = "파일 (Files)", description = "파일 업로드 및 다운로드 API")
 @Slf4j
@@ -40,6 +42,7 @@ public class FileController {
     private final FileService fileService;
     private final FileRepository fileRepository;
     private final UserRepository userRepository;
+    private final UserCacheStore userCacheStore;
 
     /**
      * 파일 업로드
@@ -58,11 +61,12 @@ public class FileController {
     })
     @PostMapping("/upload")
     public ResponseEntity<?> uploadFile(
-            @Parameter(description = "업로드할 파일") @RequestParam("file") MultipartFile file,
-            Principal principal) {
+        @Parameter(description = "업로드할 파일") @RequestParam("file") MultipartFile file,
+        Principal principal) {
         try {
-            User user = userRepository.findByEmail(principal.getName())
-                    .orElseThrow(() -> new UsernameNotFoundException("User not found: " + principal.getName()));
+//            User user = userRepository.findByEmail(principal.getName())
+//                    .orElseThrow(() -> new UsernameNotFoundException("User not found: " + principal.getName()));
+            User user = userCacheStore.getUserByEmail(principal.getName());
 
             FileUploadResult result = fileService.uploadFile(file, user.getId());
 
@@ -70,7 +74,7 @@ public class FileController {
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", true);
                 response.put("message", "파일 업로드 성공");
-                
+
                 Map<String, Object> fileData = new HashMap<>();
                 fileData.put("_id", result.getFile().getId());
                 fileData.put("filename", result.getFile().getFilename());
@@ -78,7 +82,7 @@ public class FileController {
                 fileData.put("mimetype", result.getFile().getMimetype());
                 fileData.put("size", result.getFile().getSize());
                 fileData.put("uploadDate", result.getFile().getUploadDate());
-                
+
                 response.put("file", fileData);
 
                 return ResponseEntity.ok(response);
@@ -116,36 +120,37 @@ public class FileController {
     })
     @GetMapping("/download/{filename:.+}")
     public ResponseEntity<?> downloadFile(
-            @Parameter(description = "다운로드할 파일명") @PathVariable String filename,
-            HttpServletRequest request,
-            Principal principal) {
+        @Parameter(description = "다운로드할 파일명") @PathVariable String filename,
+        HttpServletRequest request,
+        Principal principal) {
         try {
-            User user = userRepository.findByEmail(principal.getName())
-                    .orElseThrow(() -> new UsernameNotFoundException("User not found: " + principal.getName()));
+            //            User user = userRepository.findByEmail(principal.getName())
+//                    .orElseThrow(() -> new UsernameNotFoundException("User not found: " + principal.getName()));
+            User user = userCacheStore.getUserByEmail(principal.getName());
 
             Resource resource = fileService.loadFileAsResource(filename, user.getId());
 
             File fileEntity = fileRepository.findByFilename(filename)
-                    .orElse(null);
+                .orElse(null);
 
             String originalFilename = fileEntity != null ? fileEntity.getOriginalname() : filename;
             String encodedFilename = URLEncoder.encode(originalFilename, StandardCharsets.UTF_8)
-                    .replaceAll("\\+", "%20");
+                .replaceAll("\\+", "%20");
 
             String contentDisposition = String.format(
-                    "attachment; filename*=UTF-8''%s",
-                    encodedFilename
+                "attachment; filename*=UTF-8''%s",
+                encodedFilename
             );
 
             long contentLength = fileEntity != null ? fileEntity.getSize() : resource.contentLength();
 
             return ResponseEntity.ok()
-                    .contentType(MediaType.parseMediaType(fileEntity.getMimetype()))
-                    .contentLength(contentLength)
-                    .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition)
-                    .header(HttpHeaders.CACHE_CONTROL, "private, no-cache, no-store, must-revalidate")
-                    .header(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, "Content-Disposition")
-                    .body(resource);
+                .contentType(MediaType.parseMediaType(fileEntity.getMimetype()))
+                .contentLength(contentLength)
+                .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition)
+                .header(HttpHeaders.CACHE_CONTROL, "private, no-cache, no-store, must-revalidate")
+                .header(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, "Content-Disposition")
+                .body(resource);
 
         } catch (Exception e) {
             log.error("파일 다운로드 중 에러 발생: {}", filename, e);
@@ -189,17 +194,18 @@ public class FileController {
 
     @GetMapping("/view/{filename:.+}")
     public ResponseEntity<?> viewFile(
-            @PathVariable String filename,
-            HttpServletRequest request,
-            Principal principal) {
+        @PathVariable String filename,
+        HttpServletRequest request,
+        Principal principal) {
         try {
-            User user = userRepository.findByEmail(principal.getName())
-                    .orElseThrow(() -> new UsernameNotFoundException("User not found: " + principal.getName()));
+            //            User user = userRepository.findByEmail(principal.getName())
+//                    .orElseThrow(() -> new UsernameNotFoundException("User not found: " + principal.getName()));
+            User user = userCacheStore.getUserByEmail(principal.getName());
 
             Resource resource = fileService.loadFileAsResource(filename, user.getId());
 
             File fileEntity = fileRepository.findByFilename(filename)
-                    .orElseThrow(() -> new RuntimeException("파일을 찾을 수 없습니다."));
+                .orElseThrow(() -> new RuntimeException("파일을 찾을 수 없습니다."));
 
             if (!fileEntity.isPreviewable()) {
                 Map<String, Object> errorResponse = new HashMap<>();
@@ -211,22 +217,22 @@ public class FileController {
 
             String originalFilename = fileEntity.getOriginalname();
             String encodedFilename = URLEncoder.encode(originalFilename, StandardCharsets.UTF_8)
-                    .replaceAll("\\+", "%20");
+                .replaceAll("\\+", "%20");
 
             String contentDisposition = String.format(
-                    "inline; filename=\"%s\"; filename*=UTF-8''%s",
-                    originalFilename,
-                    encodedFilename
+                "inline; filename=\"%s\"; filename*=UTF-8''%s",
+                originalFilename,
+                encodedFilename
             );
 
             long contentLength = fileEntity.getSize();
 
             return ResponseEntity.ok()
-                    .contentType(MediaType.parseMediaType(fileEntity.getMimetype()))
-                    .contentLength(contentLength)
-                    .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition)
-                    .header(HttpHeaders.CACHE_CONTROL, "public, max-age=31536000, immutable")
-                    .body(resource);
+                .contentType(MediaType.parseMediaType(fileEntity.getMimetype()))
+                .contentLength(contentLength)
+                .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition)
+                .header(HttpHeaders.CACHE_CONTROL, "public, max-age=31536000, immutable")
+                .body(resource);
 
         } catch (Exception e) {
             log.error("파일 미리보기 중 에러 발생: {}", filename, e);
@@ -237,8 +243,9 @@ public class FileController {
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteFile(@PathVariable String id, Principal principal) {
         try {
-            User user = userRepository.findByEmail(principal.getName())
-                    .orElseThrow(() -> new UsernameNotFoundException("User not found: " + principal.getName()));
+            //            User user = userRepository.findByEmail(principal.getName())
+//                    .orElseThrow(() -> new UsernameNotFoundException("User not found: " + principal.getName()));
+            User user = userCacheStore.getUserByEmail(principal.getName());
 
             boolean deleted = fileService.deleteFile(id, user.getId());
 
@@ -257,7 +264,7 @@ public class FileController {
         } catch (RuntimeException e) {
             log.error("파일 삭제 중 에러 발생: {}", id, e);
             String errorMessage = e.getMessage();
-            
+
             if (errorMessage != null && errorMessage.contains("찾을 수 없습니다")) {
                 Map<String, Object> errorResponse = new HashMap<>();
                 errorResponse.put("success", false);
@@ -269,7 +276,7 @@ public class FileController {
                 errorResponse.put("message", "파일을 삭제할 권한이 없습니다.");
                 return ResponseEntity.status(403).body(errorResponse);
             }
-            
+
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("success", false);
             errorResponse.put("message", "파일 삭제 중 오류가 발생했습니다.");

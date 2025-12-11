@@ -1,6 +1,7 @@
 package com.ktb.chatapp.service;
 
 import com.ktb.chatapp.cache.RoomCacheStore;
+import com.ktb.chatapp.cache.UserCacheStore;
 import com.ktb.chatapp.dto.*;
 import com.ktb.chatapp.event.RoomCreatedEvent;
 import com.ktb.chatapp.event.RoomUpdatedEvent;
@@ -36,6 +37,7 @@ public class RoomService {
     private final PasswordEncoder passwordEncoder;
     private final ApplicationEventPublisher eventPublisher;
     private final RoomCacheStore roomCacheStore;
+    private final UserCacheStore userCacheStore;
 
     public RoomsResponse getAllRoomsWithPagination(
             com.ktb.chatapp.dto.PageRequest pageRequest, String name) {
@@ -157,8 +159,9 @@ public class RoomService {
     }
 
     public Room createRoom(CreateRoomRequest createRoomRequest, String name) {
-        User creator = userRepository.findByEmail(name)
-            .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + name));
+//        User creator = userRepository.findByEmail(name)
+//            .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + name));
+        User creator = userCacheStore.getUserByEmail(name);
 
         Room room = new Room();
         room.setName(createRoomRequest.getName().trim());
@@ -195,8 +198,9 @@ public class RoomService {
         }
 
         Room room = roomOpt.get();
-        User user = userRepository.findByEmail(name)
-            .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + name));
+//        User user = userRepository.findByEmail(name)
+//            .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + name));
+        User user = userCacheStore.getUserByEmail(name);
 
         // 비밀번호 확인
         if (room.isHasPassword()) {
