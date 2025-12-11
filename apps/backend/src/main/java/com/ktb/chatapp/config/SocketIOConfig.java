@@ -53,8 +53,9 @@ public class SocketIOConfig {
         config.setPingTimeout(60000);
         config.setPingInterval(25000);
         config.setUpgradeTimeout(10000);
-        // 추가: polling + websocket 둘 다 허용
+        // FIX: 백엔드 socket 에러 로그
         config.setTransports(Transport.POLLING, Transport.WEBSOCKET);
+
 
 
         config.setJsonSupport(new JacksonJsonSupport(new JavaTimeModule()));
