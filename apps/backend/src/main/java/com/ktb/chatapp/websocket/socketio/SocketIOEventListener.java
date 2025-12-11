@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 import static com.ktb.chatapp.websocket.socketio.SocketIOEvents.*;
@@ -19,6 +20,7 @@ public class SocketIOEventListener {
 
     private final SocketIOServer socketIOServer;
 
+    @Async("eventRelayExecutor")
     @EventListener
     public void handleSessionEndedEvent(SessionEndedEvent event) {
         try {
@@ -33,6 +35,7 @@ public class SocketIOEventListener {
         }
     }
 
+    @Async("eventRelayExecutor")
     @EventListener
     public void handleRoomCreatedEvent(RoomCreatedEvent event) {
         try {
@@ -43,6 +46,7 @@ public class SocketIOEventListener {
         }
     }
 
+    @Async("eventRelayExecutor")
     @EventListener
     public void handleRoomUpdatedEvent(RoomUpdatedEvent event) {
         try {
