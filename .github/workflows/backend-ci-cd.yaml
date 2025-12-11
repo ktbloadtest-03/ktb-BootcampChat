@@ -65,8 +65,8 @@ jobs:
 
       - name: Build and Push Docker Image
         run: |
-          # application.properties 생성
-          echo "${{ secrets.APPLICATION_PROPERTIES }}" > apps/backend/src/main/resources/application.properties
+          # application.properties 생성 (Base64 디코딩)
+          echo "${{ secrets.APPLICATION_PROPERTIES }}" | base64 -d > apps/backend/src/main/resources/application.properties
           echo "application.properties created."
 
           # 브랜치명과 SHA로 태그 결정
