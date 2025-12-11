@@ -37,3 +37,10 @@ scrape_configs:
       - files:
           - '/etc/prometheus/targets/node-exporters.prod.yml'
         refresh_interval: 5s
+
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        metric_relabel_configs:
+          - source_labels: [container_label_com_docker_compose_service]
+            target_label: container_name

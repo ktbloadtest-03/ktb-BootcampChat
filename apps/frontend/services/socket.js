@@ -36,7 +36,21 @@ class SocketService {
           this.cleanup(CLEANUP_REASONS.RECONNECT);
         }
 
-        const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL;
+        let socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL;
+        const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+
+        // 환경 변수가 없거나 IP 주소를 직접 사용하는 경우, 현재 페이지의 호스트 사용 (ALB를 통해 연결)
+        if (typeof window !== 'undefined' && (!socketUrl || socketUrl.match(/^w?s?:\/\/\d+\.\d+\.\d+\.\d+/))) {
+          const host = window.location.host;
+          socketUrl = isHttps ? `wss://${host}` : `ws://${host}`;
+        } else if (socketUrl && isHttps) {
+          // HTTPS 페이지에서 HTTP WebSocket을 사용하려고 하면 자동으로 WSS로 변환
+          if (socketUrl.startsWith('ws://')) {
+            socketUrl = socketUrl.replace('ws://', 'wss://');
+          } else if (socketUrl.startsWith('http://')) {
+            socketUrl = socketUrl.replace('http://', 'wss://');
+          }
+        }
 
         this.socket = io(socketUrl, {
           ...options,
