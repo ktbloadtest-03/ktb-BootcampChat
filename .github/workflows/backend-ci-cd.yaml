@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - develop
+      - feat/ci-cd
     paths:
       - 'apps/backend/**'
       - '.github/workflows/backend-ci-cd.yaml'
@@ -49,7 +50,7 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     if: >
-      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')) ||
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/feat/ci-cd')) ||
       (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'develop')
 
     steps:
@@ -68,6 +69,9 @@ jobs:
           if [ "${{ github.ref }}" == "refs/heads/main" ]; then
             IMAGE_TAG="main-${{ github.sha }}"
             LATEST_TAG="latest"
+          elif [ "${{ github.ref }}" == "refs/heads/feat/ci-cd" ]; then
+            IMAGE_TAG="feat-ci-cd-${{ github.sha }}"
+            LATEST_TAG=""
           else
             IMAGE_TAG="develop-${{ github.sha }}"
             LATEST_TAG=""
@@ -94,9 +98,15 @@ jobs:
     needs: build-and-push-image
     runs-on: ubuntu-latest
     if: >
-      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')) ||
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/feat/ci-cd')) ||
       (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'develop')
-
+    # Matrix strategy를 사용하여 서버 리스트 기반 병렬 배포
+    strategy:
+      fail-fast: false  # 한 서버 실패해도 다른 서버 배포는 계속 진행
+      matrix:
+        # 서버 식별자 리스트 - 새로운 서버 추가 시 여기에만 추가하면 됨
+        server: [be, server2]
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -106,19 +116,33 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.SERVER_HOST_BE }} >> ~/.ssh/known_hosts
-          ssh-keyscan -H ${{ secrets.SERVER_HOST_2 }} >> ~/.ssh/known_hosts
+
+      - name: Set Server Host
+        id: set-host
+        run: |
+          # 서버 식별자에 따라 호스트 선택
+          if [ "${{ matrix.server }}" == "be" ]; then
+            SERVER_HOST="${{ secrets.SERVER_HOST_BE }}"
+          elif [ "${{ matrix.server }}" == "server2" ]; then
+            SERVER_HOST="${{ secrets.SERVER_HOST_2 }}"
+          else
+            echo "Unknown server: ${{ matrix.server }}"
+            exit 1
+          fi
+          echo "server_host=${SERVER_HOST}" >> $GITHUB_OUTPUT
+          echo "Selected server: ${{ matrix.server }} -> ${SERVER_HOST}"
+          ssh-keyscan -H ${SERVER_HOST} >> ~/.ssh/known_hosts
 
       - name: Check if Docker is installed
         id: check-docker
         run: |
-          DOCKER_EXISTS=$(ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST_BE }} 'command -v docker >/dev/null && echo "true" || echo "false"')
+          DOCKER_EXISTS=$(ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ steps.set-host.outputs.server_host }} 'command -v docker >/dev/null && echo "true" || echo "false"')
           echo "docker_exists=$DOCKER_EXISTS" >> $GITHUB_OUTPUT
 
       - name: Install Docker on EC2
         if: steps.check-docker.outputs.docker_exists == 'false'
         run: |
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST_BE }} << 'EOF'
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ steps.set-host.outputs.server_host }} << 'EOF'
             sudo apt-get update
             sudo apt-get install -y \
               ca-certificates \
@@ -140,12 +164,14 @@ jobs:
 
       - name: Deploy to EC2
         run: |
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST_BE }} << 'EOF'
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ steps.set-host.outputs.server_host }} << 'EOF'
             set -e
           
             # Docker 이미지 태그 결정
             if [ "${{ github.ref }}" == "refs/heads/main" ]; then
               IMAGE_TAG="main-${{ github.sha }}"
+            elif [ "${{ github.ref }}" == "refs/heads/feat/ci-cd" ]; then
+              IMAGE_TAG="feat-ci-cd-${{ github.sha }}"
             else
               IMAGE_TAG="develop-${{ github.sha }}"
             fi
@@ -153,154 +179,71 @@ jobs:
             IMAGE_NAME="${{ secrets.DOCKER_USERNAME }}/ktb-chat-backend:${IMAGE_TAG}"
           
             echo "=========================================="
-            echo "  Deploying: ${IMAGE_NAME}"
+            echo "  Deploying to: ${{ matrix.server }}"
+            echo "  Image: ${IMAGE_NAME}"
             echo "=========================================="
           
             # Docker Hub 로그인
             echo "🔐 Logging in to Docker Hub..."
             echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin || true
-            # Docker 이미지 pull
-            echo "📥 Pulling Docker image..."
-            docker pull ${IMAGE_NAME}
-          
-            # 기존 컨테이너 백업 (롤백을 위해)
-            OLD_CONTAINER=$(docker ps -a --filter "name=ktb-chat-backend" --format "{{.ID}}" | head -1)
-            if [ -n "$OLD_CONTAINER" ]; then
-              echo "📦 Backing up old container..."
-              docker rename ktb-chat-backend ktb-chat-backend-backup-$(date +%s) 2>/dev/null || true
-            fi
-          
-            # 기존 컨테이너 중지 및 제거
-            echo "🛑 Stopping existing containers..."
-            docker stop ktb-chat-backend 2>/dev/null || true
-            docker rm ktb-chat-backend 2>/dev/null || true
-          
-            # CORS 환경 변수 설정 (프론트엔드 도메인)
-            CORS_ENV=""
-            if [ -n "${{ secrets.SERVER_HOST_FE }}" ]; then
-              CORS_ENV="-e CORS_ALLOWED_ORIGINS=${{ secrets.SERVER_HOST_FE }}"
-              echo "🌐 CORS 설정: ${{ secrets.SERVER_HOST_FE }}"
-            fi
-          
-            # JWT 시크릿 환경 변수 설정 및 Mongo URI 설정
-            # JWT 시크릿 환경 변수 설정 및 Mongo URI 설정
-            JWT_ENV="d7689060b5bc059a5661401c72f820614ed942d15e4aa928b633e60f1e17cef9"
-            MONGO_ENV="mongodb://43.203.48.10:27017/bootcamp-chat"
-            REDIS_IP="43.200.29.6"
-            REDIS_PORT="6379"
-          
-            echo "🚀 Starting new container..."
-            docker run -d \
-            --name ktb-chat-backend \
-            --restart unless-stopped \
-            -p 5001:5001 \
-            -p 5002:5002 \
-            -e "socketio.server.host=0.0.0.0" \
-            -e "socketio.server.port=5002" \
-            ${CORS_ENV} \
-            -e JWT_SECRET=${JWT_ENV} \
-            -e MONGO_URI=${MONGO_ENV} \
-            -e REDIS_HOST=${REDIS_IP} \
-            -e REDIS_PORT=${REDIS_PORT} \
-            ${IMAGE_NAME}
-          
-            # 컨테이너 상태 확인
-            echo "⏳ Waiting for container to start..."
-            sleep 5
-          
-            if ! docker ps | grep -q ktb-chat-backend; then
-              echo "❌ Container failed to start"
-              docker logs ktb-chat-backend 2>/dev/null || true
-              exit 1
-            fi
-          
-            # 헬스체크 (최대 60초 대기)
-            echo "🏥 Performing health check..."
-            MAX_WAIT=60
-            ELAPSED=0
-            HEALTHY=false
-          
-            while [ $ELAPSED -lt $MAX_WAIT ]; do
-              if curl -sf http://localhost:5001/api/health > /dev/null 2>&1; then
-                HEALTHY=true
-                break
-              fi
-              sleep 2
-              ELAPSED=$((ELAPSED + 2))
-              echo -n "."
-            done
-            echo ""
-          
-            if [ "$HEALTHY" = true ]; then
-              echo "✅ Health check passed!"
-          
-              # 오래된 백업 컨테이너 정리 (최근 3개만 유지)
-              echo "🧹 Cleaning up old backup containers..."
-              docker ps -a --filter "name=ktb-chat-backend-backup" --format "{{.ID}} {{.CreatedAt}}" | \
-                sort -k2 -r | tail -n +4 | cut -d' ' -f1 | \
-                xargs -r docker rm -f 2>/dev/null || true
-          
-              echo "=========================================="
-              echo "✅ Deployment completed successfully!"
-              echo "=========================================="
-            else
-              echo "❌ Health check failed after ${MAX_WAIT}s"
-              echo "📋 Container logs:"
-              docker logs --tail 50 ktb-chat-backend
-              exit 1
-            fi
-          EOF
-
-      - name: Deploy to EC2 (server 2)
-        run: |
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST_2 }} << 'EOF'
-            set -e
-
-            # Docker 이미지 태그 결정
-            if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-              IMAGE_TAG="main-${{ github.sha }}"
-            else
-              IMAGE_TAG="develop-${{ github.sha }}"
-            fi
-
-            IMAGE_NAME="${{ secrets.DOCKER_USERNAME }}/ktb-chat-backend:${IMAGE_TAG}"
-
-            echo "=========================================="
-            echo "  Deploying: ${IMAGE_NAME}"
-            echo "=========================================="
-
-            # Docker Hub 로그인
-            echo "🔐 Logging in to Docker Hub..."
-            echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin || true
-            # Docker 이미지 pull
-            echo "📥 Pulling Docker image..."
-            docker pull ${IMAGE_NAME}
-
-            # 기존 컨테이너 백업 (롤백을 위해)
-            OLD_CONTAINER=$(docker ps -a --filter "name=ktb-chat-backend" --format "{{.ID}}" | head -1)
-            if [ -n "$OLD_CONTAINER" ]; then
-              echo "📦 Backing up old container..."
-              docker rename ktb-chat-backend ktb-chat-backend-backup-$(date +%s) 2>/dev/null || true
-            fi
-
-            # 기존 컨테이너 중지 및 제거
-            echo "🛑 Stopping existing containers..."
-            docker stop ktb-chat-backend 2>/dev/null || true
-            docker rm ktb-chat-backend 2>/dev/null || true
-
-            # CORS 환경 변수 설정 (프론트엔드 도메인)
-            CORS_ENV=""
-            if [ -n "${{ secrets.SERVER_HOST_FE }}" ]; then
-              CORS_ENV="-e CORS_ALLOWED_ORIGINS=${{ secrets.SERVER_HOST_FE }}"
-              echo "🌐 CORS 설정: ${{ secrets.SERVER_HOST_FE }}"
-            fi
-
-            # JWT 시크릿 환경 변수 설정 및 Mongo URI 설정
-            JWT_ENV="d7689060b5bc059a5661401c72f820614ed942d15e4aa928b633e60f1e17cef9"
-            MONGO_ENV="mongodb://43.203.48.10:27017/bootcamp-chat"
-            REDIS_IP="43.200.29.6"
-            REDIS_PORT="6379"
             
+            # Docker 이미지 pull
+            echo "📥 Pulling Docker image..."
+            docker pull ${IMAGE_NAME}
+          
+            # 기존 컨테이너 정리 - 개선된 로직
+            echo "🛑 Stopping and removing existing containers..."
+            
+            # 메인 컨테이너 찾기 (정확한 이름 매칭)
+            MAIN_CONTAINER=$(docker ps -a --filter "name=^ktb-chat-backend$" --format "{{.ID}}" | head -1)
+            
+            if [ -n "$MAIN_CONTAINER" ]; then
+              echo "📦 Found main container: ${MAIN_CONTAINER}"
+              
+              # 실행 중이면 중지
+              if docker ps --format "{{.ID}}" | grep -q "^${MAIN_CONTAINER}$"; then
+                echo "  Stopping container..."
+                docker stop ${MAIN_CONTAINER} 2>/dev/null || true
+                sleep 2
+              fi
+              
+              # 백업으로 이름 변경
+              BACKUP_NAME="ktb-chat-backend-backup-$(date +%s)"
+              echo "  Renaming to backup: ${BACKUP_NAME}"
+              docker rename ${MAIN_CONTAINER} ${BACKUP_NAME} 2>/dev/null || true
+              
+              # 백업 컨테이너 제거 (이미 이름이 변경되었으므로)
+              docker rm -f ${BACKUP_NAME} 2>/dev/null || true
+            else
+              echo "  No main container found"
+            fi
+            
+            # 혹시 남아있을 수 있는 모든 ktb-chat-backend 컨테이너 강제 정리
+            echo "🧹 Force cleaning any remaining containers..."
+            REMAINING_CONTAINERS=$(docker ps -a --filter "name=ktb-chat-backend" --format "{{.ID}}" || true)
+            if [ -n "$REMAINING_CONTAINERS" ]; then
+              for CONTAINER_ID in $REMAINING_CONTAINERS; do
+                if [ -n "$CONTAINER_ID" ]; then
+                  echo "  Removing container: ${CONTAINER_ID}"
+                  docker stop ${CONTAINER_ID} 2>/dev/null || true
+                  docker rm -f ${CONTAINER_ID} 2>/dev/null || true
+                fi
+              done
+            fi
+          
+            # CORS 환경 변수 설정 (프론트엔드 도메인)
+            CORS_ENV=""
+            if [ -n "${{ secrets.SERVER_HOST_FE }}" ]; then
+              CORS_ENV="-e CORS_ALLOWED_ORIGINS=${{ secrets.SERVER_HOST_FE }}"
+              echo "🌐 CORS 설정: ${{ secrets.SERVER_HOST_FE }}"
+            fi
+          
+            # JWT 시크릿 환경 변수 설정 및 Mongo URI 설정
+            JWT_ENV="d7689060b5bc059a5661401c72f820614ed942d15e4aa928b633e60f1e17cef9"
+            MONGO_ENV="mongodb://43.203.48.10:27017/bootcamp-chat"
+            REDIS_IP="43.200.29.6"
+            REDIS_PORT="6379"
+          
             echo "🚀 Starting new container..."
             docker run -d \
             --name ktb-chat-backend \
@@ -315,23 +258,23 @@ jobs:
             -e REDIS_HOST=${REDIS_IP} \
             -e REDIS_PORT=${REDIS_PORT} \
             ${IMAGE_NAME}
-
+          
             # 컨테이너 상태 확인
             echo "⏳ Waiting for container to start..."
             sleep 5
-
+          
             if ! docker ps | grep -q ktb-chat-backend; then
               echo "❌ Container failed to start"
               docker logs ktb-chat-backend 2>/dev/null || true
               exit 1
             fi
-
+          
             # 헬스체크 (최대 60초 대기)
             echo "🏥 Performing health check..."
             MAX_WAIT=60
             ELAPSED=0
             HEALTHY=false
-
+          
             while [ $ELAPSED -lt $MAX_WAIT ]; do
               if curl -sf http://localhost:5001/api/health > /dev/null 2>&1; then
                 HEALTHY=true
@@ -342,16 +285,16 @@ jobs:
               echo -n "."
             done
             echo ""
-
+          
             if [ "$HEALTHY" = true ]; then
               echo "✅ Health check passed!"
-
+          
               # 오래된 백업 컨테이너 정리 (최근 3개만 유지)
               echo "🧹 Cleaning up old backup containers..."
               docker ps -a --filter "name=ktb-chat-backend-backup" --format "{{.ID}} {{.CreatedAt}}" | \
                 sort -k2 -r | tail -n +4 | cut -d' ' -f1 | \
                 xargs -r docker rm -f 2>/dev/null || true
-
+          
               echo "=========================================="
               echo "✅ Deployment completed successfully!"
               echo "=========================================="
