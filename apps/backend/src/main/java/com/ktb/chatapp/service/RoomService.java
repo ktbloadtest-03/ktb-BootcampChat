@@ -236,11 +236,12 @@ public class RoomService {
             creator = userRepository.findById(room.getCreator()).orElse(null);
         }
 
-        List<User> participants = room.getParticipantIds().stream()
-            .map(userRepository::findById)
-            .filter(Optional::isPresent)
-            .map(Optional::get)
-            .toList();
+        List<User> participants = userRepository.findAllById(room.getParticipantIds());
+//        List<User> participants = room.getParticipantIds().stream()
+//            .map(userRepository::findById)
+//            .filter(Optional::isPresent)
+//            .map(Optional::get)
+//            .toList();
 
         // 최근 10분간 메시지 수 조회
         LocalDateTime tenMinutesAgo = LocalDateTime.now().minusMinutes(10);
