@@ -60,7 +60,7 @@ public class ConnectionLoginHandler {
         String userId = user.id();
         
         try {
-            notifyDuplicateLogin(client, userId);
+            // notifyDuplicateLogin(client, userId);
             client.set("user", user);
             
             userRooms.get(userId).forEach(roomId -> {
