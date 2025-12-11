@@ -3,7 +3,7 @@
 # 서버 추가 시 이 파일만 수정하면 자동으로 반영됩니다 (Prometheus 재시작 불필요)
 
 - targets:
-    - 'IP:PORT'
+    - '13.209.108.215:9100'
   labels:
     environment: 'production'
     region: 'ap-northeast-2'
@@ -11,7 +11,7 @@
     service: 'api'
 
 - targets:
-    - 'IP:PORT'
+    - '3.39.127.84:9100'
   labels:
     environment: 'production'
     region: 'ap-northeast-2'
@@ -19,7 +19,7 @@
     service: 'next'
 
 - targets:
-    - 'IP:PORT'
+    - '43.203.48.10:9100'
   labels:
     environment: 'production'
     region: 'ap-northeast-2'
