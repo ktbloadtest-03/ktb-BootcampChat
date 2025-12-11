@@ -109,7 +109,7 @@ jobs:
       fail-fast: false  # 한 서버 실패해도 다른 서버 배포는 계속 진행
       matrix:
         # 서버 식별자 리스트 - 새로운 서버 추가 시 여기에만 추가하면 됨
-        server: [be, server2]
+        server: [be, server2, server3, server4, server5, server6, server7, server8, server9, server10, server11, server12]
     
     steps:
       - name: Checkout code
@@ -129,6 +129,26 @@ jobs:
             SERVER_HOST="${{ secrets.SERVER_HOST_BE }}"
           elif [ "${{ matrix.server }}" == "server2" ]; then
             SERVER_HOST="${{ secrets.SERVER_HOST_2 }}"
+                    elif [ "${{ matrix.server }}" == "server3" ]; then
+            SERVER_HOST="${{ secrets.SERVER_HOST_3 }}"
+          elif [ "${{ matrix.server }}" == "server4" ]; then
+            SERVER_HOST="${{ secrets.SERVER_HOST_4 }}"
+          elif [ "${{ matrix.server }}" == "server5" ]; then
+            SERVER_HOST="${{ secrets.SERVER_HOST_5 }}"
+          elif [ "${{ matrix.server }}" == "server6" ]; then
+            SERVER_HOST="${{ secrets.SERVER_HOST_6 }}"
+          elif [ "${{ matrix.server }}" == "server7" ]; then
+            SERVER_HOST="${{ secrets.SERVER_HOST_7 }}"
+          elif [ "${{ matrix.server }}" == "server8" ]; then
+            SERVER_HOST="${{ secrets.SERVER_HOST_8 }}"
+          elif [ "${{ matrix.server }}" == "server9" ]; then
+            SERVER_HOST="${{ secrets.SERVER_HOST_9 }}"
+          elif [ "${{ matrix.server }}" == "server10" ]; then
+            SERVER_HOST="${{ secrets.SERVER_HOST_10 }}"
+          elif [ "${{ matrix.server }}" == "server11" ]; then
+            SERVER_HOST="${{ secrets.SERVER_HOST_11 }}"
+          elif [ "${{ matrix.server }}" == "server12" ]; then
+            SERVER_HOST="${{ secrets.SERVER_HOST_12 }}"
           else
             echo "Unknown server: ${{ matrix.server }}"
             exit 1
