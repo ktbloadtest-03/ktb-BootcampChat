@@ -16,6 +16,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import lombok.extern.slf4j.Slf4j;
+import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -28,27 +29,21 @@ import org.springframework.web.multipart.MultipartFile;
 public class LocalFileService implements FileService {
 
     private final Path fileStorageLocation;
+    private final S3Service s3Service;
     private final FileRepository fileRepository;
     private final MessageRepository messageRepository;
     private final RoomRepository roomRepository;
 
     public LocalFileService(@Value("${file.upload-dir:uploads}") String uploadDir,
+                      S3Service s3Service,
                       FileRepository fileRepository,
                       MessageRepository messageRepository,
                       RoomRepository roomRepository) {
+        this.s3Service = s3Service;
         this.fileRepository = fileRepository;
         this.messageRepository = messageRepository;
         this.roomRepository = roomRepository;
         this.fileStorageLocation = Paths.get(uploadDir).toAbsolutePath().normalize();
-    }
-    
-    @PostConstruct
-    public void init() {
-        try {
-            Files.createDirectories(this.fileStorageLocation);
-        } catch (Exception ex) {
-            throw new RuntimeException("Could not create the directory where the uploaded files will be stored.", ex);
-        }
     }
 
     @Override
@@ -65,30 +60,29 @@ public class LocalFileService implements FileService {
             originalFilename = StringUtils.cleanPath(originalFilename);
             String safeFileName = FileUtil.generateSafeFileName(originalFilename);
 
-            // 파일 경로 보안 검증
-            Path filePath = fileStorageLocation.resolve(safeFileName);
-            FileUtil.validatePath(filePath, fileStorageLocation);
-
-            // 파일 저장
-            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-
-            log.info("파일 저장 완료: {}", safeFileName);
-
             // 원본 파일명 정규화
             String normalizedOriginalname = FileUtil.normalizeOriginalFilename(originalFilename);
 
+            String generatedId = new ObjectId().toHexString();
+
             // 메타데이터 생성 및 저장
             File fileEntity = File.builder()
+                    .id(generatedId)
                     .filename(safeFileName)
                     .originalname(normalizedOriginalname)
                     .mimetype(file.getContentType())
                     .size(file.getSize())
-                    .path(filePath.toString())
+                    .path("")
                     .user(uploaderId)
                     .uploadDate(LocalDateTime.now())
                     .build();
 
+            String fileEntityPath = s3Service.putFile(file, fileEntity.getId());
+            fileEntity.setPath(fileEntityPath);
+
             File savedFile = fileRepository.save(fileEntity);
+
+            log.info("파일 저장 완료: {}", safeFileName);
 
             return FileUploadResult.builder()
                     .success(true)
@@ -166,10 +160,8 @@ public class LocalFileService implements FileService {
             }
 
             // 5. 파일 경로 검증 및 로드
-            Path filePath = this.fileStorageLocation.resolve(fileName).normalize();
-            FileUtil.validatePath(filePath, this.fileStorageLocation);
+            Resource resource = new UrlResource(s3Service.getFile(fileEntity.getId()));
 
-            Resource resource = new UrlResource(filePath.toUri());
             if (resource.exists()) {
                 log.info("파일 로드 성공: {} (사용자: {})", fileName, requesterId);
                 return resource;
@@ -194,13 +186,38 @@ public class LocalFileService implements FileService {
             }
 
             // 물리적 파일 삭제
-            Path filePath = this.fileStorageLocation.resolve(fileEntity.getFilename());
-            Files.deleteIfExists(filePath);
+            s3Service.deleteFile(fileId);
 
             // 데이터베이스에서 제거
             fileRepository.delete(fileEntity);
 
             log.info("파일 삭제 완료: {} (사용자: {})", fileId, requesterId);
+            return true;
+
+        } catch (Exception e) {
+            log.error("파일 삭제 실패: {}", e.getMessage(), e);
+            throw new RuntimeException("파일 삭제 중 오류가 발생했습니다.", e);
+        }
+    }
+
+    @Override
+    public boolean deleteFileWithPath(String path, String requesterId) {
+        try{
+            File fileEntity = fileRepository.findByPath(path)
+                    .orElseThrow(() -> new RuntimeException("파일을 찾을 수 없습니다."));
+
+            // 삭제 권한 검증 (업로더만 삭제 가능)
+            if (!fileEntity.getUser().equals(requesterId)) {
+                throw new RuntimeException("파일을 삭제할 권한이 없습니다.");
+            }
+
+            // 물리적 파일 삭제
+            s3Service.deleteFile(fileEntity.getId());
+
+            // 데이터베이스에서 제거
+            fileRepository.delete(fileEntity);
+
+            log.info("파일 삭제 완료: {} (사용자: {})", fileEntity.getId(), requesterId);
             return true;
 
         } catch (Exception e) {

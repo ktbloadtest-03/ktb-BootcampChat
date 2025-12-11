@@ -98,6 +98,7 @@ public class RedisConfig {
         Map<String, RedisCacheConfiguration> redisCacheConfigurationMap = new HashMap<>();
         redisCacheConfigurationMap.put("user::email", redisCacheConfiguration);
         redisCacheConfigurationMap.put("RoomCache", redisCacheConfiguration);
+        redisCacheConfigurationMap.put("userIp", redisCacheConfiguration);
 
         // RedisCacheManager 리턴
         return RedisCacheManager.RedisCacheManagerBuilder
