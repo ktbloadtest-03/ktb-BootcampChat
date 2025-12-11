@@ -3,6 +3,7 @@ package com.ktb.chatapp.websocket.socketio.handler;
 import com.corundumstudio.socketio.SocketIOClient;
 import com.corundumstudio.socketio.SocketIOServer;
 import com.corundumstudio.socketio.annotation.OnEvent;
+import com.ktb.chatapp.cache.IpCacheStore;
 import com.ktb.chatapp.cache.RoomCacheStore;
 import com.ktb.chatapp.dto.MessageResponse;
 import com.ktb.chatapp.dto.UserResponse;
@@ -45,6 +46,7 @@ public class RoomLeaveHandler {
     private final UserRooms userRooms;
     private final MessageResponseMapper messageResponseMapper;
     private final RoomCacheStore roomCacheStore;
+    private final IpCacheStore ipCacheStore;
     
     @OnEvent(LEAVE_ROOM)
     public void handleLeaveRoom(SocketIOClient client, String roomId) {
@@ -72,6 +74,7 @@ public class RoomLeaveHandler {
 
             roomCacheStore.evictRoom(roomId);
             roomRepository.removeParticipant(roomId, userId);
+            ipCacheStore.removeIp(userId);
 
             client.leaveRoom(roomId);
             userRooms.remove(userId, roomId);

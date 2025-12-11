@@ -3,6 +3,8 @@ package com.ktb.chatapp.websocket.socketio.handler;
 import com.corundumstudio.socketio.SocketIOClient;
 import com.corundumstudio.socketio.SocketIOServer;
 import com.corundumstudio.socketio.annotation.OnEvent;
+import com.ktb.chatapp.cache.IpCacheStore;
+import com.ktb.chatapp.cache.IpExtractor;
 import com.ktb.chatapp.cache.RoomCacheStore;
 import com.ktb.chatapp.dto.FetchMessagesRequest;
 import com.ktb.chatapp.dto.FetchMessagesResponse;
@@ -44,6 +46,7 @@ public class RoomJoinHandler {
     private final MessageResponseMapper messageResponseMapper;
     private final RoomLeaveHandler roomLeaveHandler;
     private final RoomCacheStore roomCacheStore;
+    private final IpCacheStore ipCacheStore;
 
     @OnEvent(JOIN_ROOM)
     public void handleJoinRoom(SocketIOClient client, String roomId) {
@@ -70,6 +73,8 @@ public class RoomJoinHandler {
             if (userRooms.isInRoom(userId, roomId)) {
                 log.debug("User {} already in room {}", userId, roomId);
                 client.joinRoom(roomId);
+                String userIp = ipCacheStore.getIp(userId);
+
                 client.sendEvent(JOIN_ROOM_SUCCESS, Map.of("roomId", roomId));
                 return;
             }
@@ -78,9 +83,11 @@ public class RoomJoinHandler {
             roomRepository.addParticipant(roomId, userId);
             roomCacheStore.evictRoom(roomId);
 
+
             // Join socket room and add to user's room set
             client.joinRoom(roomId);
             userRooms.add(userId, roomId);
+            String userIp = ipCacheStore.getIp(userId);
 
             Message joinMessage = Message.builder()
                 .roomId(roomId)
