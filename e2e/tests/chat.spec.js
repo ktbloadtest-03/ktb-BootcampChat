@@ -214,7 +214,6 @@ test.describe.serial('채팅 E2E 테스트', () => {
       );
     });
   });
-
   test.describe('실시간 채팅', () => {
     test('다자간(5인) 실시간 메시지 송수신', async ({ browser }) => {
       // 첫 번째 사용자: 채팅방 생성
