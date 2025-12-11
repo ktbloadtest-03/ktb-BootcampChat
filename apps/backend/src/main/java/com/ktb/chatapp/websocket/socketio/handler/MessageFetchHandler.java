@@ -2,6 +2,7 @@ package com.ktb.chatapp.websocket.socketio.handler;
 
 import com.corundumstudio.socketio.SocketIOClient;
 import com.corundumstudio.socketio.annotation.OnEvent;
+import com.ktb.chatapp.cache.RoomCacheStore;
 import com.ktb.chatapp.dto.FetchMessagesRequest;
 import com.ktb.chatapp.dto.FetchMessagesResponse;
 import com.ktb.chatapp.model.Room;
@@ -27,6 +28,7 @@ public class MessageFetchHandler {
 
     private final RoomRepository roomRepository;
     private final MessageLoader messageLoader;
+    private final RoomCacheStore roomCacheStore;
 
     @OnEvent(FETCH_PREVIOUS_MESSAGES)
     public void handleFetchMessages(SocketIOClient client, FetchMessagesRequest data) {
@@ -42,7 +44,8 @@ public class MessageFetchHandler {
         
         try {
             // 권한 체크
-            Room room = roomRepository.findById(data.roomId()).orElse(null);
+            Room room = roomCacheStore.getRoom(data.roomId());
+//            Room room = roomRepository.findById(data.roomId()).orElse(null);
             if (room == null || !room.getParticipantIds().contains(userId)) {
                 client.sendEvent(ERROR, Map.of(
                         "code", "LOAD_ERROR",

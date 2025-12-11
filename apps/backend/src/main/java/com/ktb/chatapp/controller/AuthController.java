@@ -1,5 +1,6 @@
 package com.ktb.chatapp.controller;
 
+import com.ktb.chatapp.cache.UserCacheStore;
 import com.ktb.chatapp.dto.*;
 import com.ktb.chatapp.event.SessionEndedEvent;
 import com.ktb.chatapp.model.User;
@@ -50,6 +51,7 @@ public class AuthController {
     private final JwtService jwtService;
     private final SessionService sessionService;
     private final ApplicationEventPublisher eventPublisher;
+    private final UserCacheStore userCacheStore;
 
     @Operation(summary = "인증 API 상태 확인", description = "인증 API의 사용 가능한 엔드포인트 목록을 반환합니다.")
     @ApiResponses({

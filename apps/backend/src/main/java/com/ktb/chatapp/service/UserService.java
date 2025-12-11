@@ -1,5 +1,6 @@
 package com.ktb.chatapp.service;
 
+import com.ktb.chatapp.cache.UserCacheStore;
 import com.ktb.chatapp.dto.ProfileImageResponse;
 import com.ktb.chatapp.dto.UpdateProfileRequest;
 import com.ktb.chatapp.dto.UserResponse;
@@ -35,6 +36,8 @@ public class UserService {
     @Value("${app.profile.image.max-size:5242880}") // 5MB
     private long maxProfileImageSize;
 
+    private final UserCacheStore userCacheStore;
+
     private static final List<String> ALLOWED_EXTENSIONS = Arrays.asList(
             "jpg", "jpeg", "png", "gif", "webp"
     );
@@ -44,8 +47,9 @@ public class UserService {
      * @param email 사용자 이메일
      */
     public UserResponse getCurrentUserProfile(String email) {
-        User user = userRepository.findByEmail(email.toLowerCase())
-                .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
+//        User user = userRepository.findByEmail(email.toLowerCase())
+//                .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
+        User user = userCacheStore.getUserByEmail(email);
         return UserResponse.from(user);
     }
 
@@ -54,13 +58,15 @@ public class UserService {
      * @param email 사용자 이메일
      */
     public UserResponse updateUserProfile(String email, UpdateProfileRequest request) {
-        User user = userRepository.findByEmail(email.toLowerCase())
-                .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
+        //        User user = userRepository.findByEmail(email.toLowerCase())
+//                .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
+        User user = userCacheStore.getUserByEmail(email);
 
         // 프로필 정보 업데이트
         user.setName(request.getName());
         user.setUpdatedAt(LocalDateTime.now());
 
+        userCacheStore.evictUserByEmail(email);
         User updatedUser = userRepository.save(user);
         log.info("사용자 프로필 업데이트 완료 - ID: {}, Name: {}", user.getId(), request.getName());
 
@@ -73,8 +79,9 @@ public class UserService {
      */
     public ProfileImageResponse uploadProfileImage(String email, MultipartFile file) {
         // 사용자 조회
-        User user = userRepository.findByEmail(email.toLowerCase())
-                .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
+        //        User user = userRepository.findByEmail(email.toLowerCase())
+//                .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
+        User user = userCacheStore.getUserByEmail(email);
 
         // 파일 유효성 검증
         validateProfileImageFile(file);
@@ -86,6 +93,8 @@ public class UserService {
 
         // 새 파일 저장 (보안 검증 포함)
         String profileImageUrl = fileService.storeFile(file, "profiles");
+
+        userCacheStore.evictUserByEmail(email);
 
         // 사용자 프로필 이미지 URL 업데이트
         user.setProfileImage(profileImageUrl);
@@ -168,10 +177,13 @@ public class UserService {
      * @param email 사용자 이메일
      */
     public void deleteProfileImage(String email) {
-        User user = userRepository.findByEmail(email.toLowerCase())
-                .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
+        //        User user = userRepository.findByEmail(email.toLowerCase())
+//                .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
+        User user = userCacheStore.getUserByEmail(email);
 
         if (user.getProfileImage() != null && !user.getProfileImage().isEmpty()) {
+            userCacheStore.evictUserByEmail(email);
+
             deleteOldProfileImage(user.getProfileImage());
             user.setProfileImage("");
             user.setUpdatedAt(LocalDateTime.now());
@@ -185,12 +197,15 @@ public class UserService {
      * @param email 사용자 이메일
      */
     public void deleteUserAccount(String email) {
-        User user = userRepository.findByEmail(email.toLowerCase())
-                .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
+        //        User user = userRepository.findByEmail(email.toLowerCase())
+//                .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
+        User user = userCacheStore.getUserByEmail(email);
 
         if (user.getProfileImage() != null && !user.getProfileImage().isEmpty()) {
             deleteOldProfileImage(user.getProfileImage());
         }
+
+        userCacheStore.evictUserByEmail(email);
 
         userRepository.delete(user);
         log.info("회원 탈퇴 완료 - User ID: {}", user.getId());

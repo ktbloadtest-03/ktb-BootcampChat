@@ -2,6 +2,7 @@ package com.ktb.chatapp.websocket.socketio.handler;
 
 import com.corundumstudio.socketio.SocketIOClient;
 import com.corundumstudio.socketio.SocketIOServer;
+import com.ktb.chatapp.cache.RoomCacheStore;
 import com.ktb.chatapp.dto.ChatMessageRequest;
 import com.ktb.chatapp.model.Room;
 import com.ktb.chatapp.model.User;
@@ -18,15 +19,16 @@ import com.ktb.chatapp.websocket.socketio.SocketUser;
 import com.ktb.chatapp.websocket.socketio.ai.AiService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Optional;
 
 import static com.ktb.chatapp.websocket.socketio.SocketIOEvents.ERROR;
 import static org.mockito.ArgumentMatchers.any;
@@ -36,15 +38,26 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class ChatMessageHandlerTest {
 
-    @Mock private SocketIOServer socketIOServer;
-    @Mock private MessageRepository messageRepository;
-    @Mock private RoomRepository roomRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private FileRepository fileRepository;
-    @Mock private AiService aiService;
-    @Mock private SessionService sessionService;
-    @Mock private BannedWordChecker bannedWordChecker;
-    @Mock private RateLimitService rateLimitService;
+    @Mock
+    private SocketIOServer socketIOServer;
+    @Mock
+    private MessageRepository messageRepository;
+    @Mock
+    private RoomRepository roomRepository;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private FileRepository fileRepository;
+    @Mock
+    private AiService aiService;
+    @Mock
+    private SessionService sessionService;
+    @Mock
+    private BannedWordChecker bannedWordChecker;
+    @Mock
+    private RateLimitService rateLimitService;
+    @Mock
+    private RoomCacheStore roomCacheStore;
     private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     private ChatMessageHandler handler;
@@ -52,17 +65,19 @@ class ChatMessageHandlerTest {
     @BeforeEach
     void setUp() {
         handler =
-                new ChatMessageHandler(
-                        socketIOServer,
-                        messageRepository,
-                        roomRepository,
-                        userRepository,
-                        fileRepository,
-                        aiService,
-                        sessionService,
-                        bannedWordChecker,
-                        rateLimitService,
-                        meterRegistry);
+            new ChatMessageHandler(
+                socketIOServer,
+                messageRepository,
+                roomRepository,
+                userRepository,
+                fileRepository,
+                aiService,
+                sessionService,
+                bannedWordChecker,
+                rateLimitService,
+                meterRegistry,
+                roomCacheStore
+            );
     }
 
     @Test
@@ -73,11 +88,11 @@ class ChatMessageHandlerTest {
 
         SessionValidationResult validResult = SessionValidationResult.valid(null);
         when(sessionService.validateSession(socketUser.id(), socketUser.authSessionId()))
-                .thenReturn(validResult);
+            .thenReturn(validResult);
 
         RateLimitCheckResult allowedResult = RateLimitCheckResult.allowed(10000, 9999, 60, System.currentTimeMillis() / 1000 + 60, 60);
         when(rateLimitService.checkRateLimit(eq(socketUser.id()), anyInt(), any()))
-                .thenReturn(allowedResult);
+            .thenReturn(allowedResult);
 
         User user = new User();
         user.setId("user-1");
@@ -89,11 +104,11 @@ class ChatMessageHandlerTest {
         when(roomRepository.findById("room-1")).thenReturn(Optional.of(room));
 
         ChatMessageRequest request =
-                ChatMessageRequest.builder()
-                        .room("room-1")
-                        .type("text")
-                        .content("bad word")
-                        .build();
+            ChatMessageRequest.builder()
+                .room("room-1")
+                .type("text")
+                .content("bad word")
+                .build();
 
         when(bannedWordChecker.containsBannedWord("bad word")).thenReturn(true);
 
