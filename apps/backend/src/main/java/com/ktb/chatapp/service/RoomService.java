@@ -11,10 +11,7 @@ import com.ktb.chatapp.repository.MessageRepository;
 import com.ktb.chatapp.repository.RoomRepository;
 import com.ktb.chatapp.repository.UserRepository;
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +27,7 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class RoomService {
+    private static final int PARTICIPANT_BATCH_SIZE = 250;
 
     private final RoomRepository roomRepository;
     private final UserRepository userRepository;
@@ -236,11 +234,25 @@ public class RoomService {
             creator = userRepository.findById(room.getCreator()).orElse(null);
         }
 
-        List<User> participants = room.getParticipantIds().stream()
-            .map(userRepository::findById)
-            .filter(Optional::isPresent)
-            .map(Optional::get)
-            .toList();
+        List<String> participantIds = room.getParticipantIds() != null
+            ? room.getParticipantIds().stream().toList()
+            : Collections.emptyList();
+
+        List<User> participants = new ArrayList<>();
+        for (int i = 0; i < participantIds.size(); i += PARTICIPANT_BATCH_SIZE) {
+            int toIndex = Math.min(i + PARTICIPANT_BATCH_SIZE, participantIds.size());
+            List<String> chunk = participantIds.subList(i, toIndex);
+
+            List<User> chunkResult = userRepository.findAllById(chunk);
+            participants.addAll(chunkResult);
+        }
+
+        //List<User> participants = userRepository.findAllById(room.getParticipantIds());
+//        List<User> participants = room.getParticipantIds().stream()
+//            .map(userRepository::findById)
+//            .filter(Optional::isPresent)
+//            .map(Optional::get)
+//            .toList();
 
         // 최근 10분간 메시지 수 조회
         LocalDateTime tenMinutesAgo = LocalDateTime.now().minusMinutes(10);
