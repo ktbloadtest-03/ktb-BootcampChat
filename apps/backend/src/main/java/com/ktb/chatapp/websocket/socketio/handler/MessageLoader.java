@@ -11,6 +11,7 @@ import com.ktb.chatapp.service.MessageReadStatusService;
 import jakarta.annotation.Nullable;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -65,12 +66,23 @@ public class MessageLoader {
         List<Message> sortedMessages = messages.reversed();
         
         var messageIds = sortedMessages.stream().map(Message::getId).toList();
-        messageReadStatusService.updateReadStatus(messageIds, userId);
-        
+        messageReadStatusService.updateReadStatus(messageIds, userId); // 비동기?
+
+        // 벌크 조회
+        List<String> senderIds = sortedMessages.stream().map(Message::getSenderId).toList();
+        List<User> senders = userRepository.findAllById(senderIds);
+        Map<String, User> senderMap = senders.stream().collect(
+            Collectors.toMap(
+                User::getId,
+                user -> user
+            )
+        );
+
         // 메시지 응답 생성
         List<MessageResponse> messageResponses = sortedMessages.stream()
                 .map(message -> {
-                    var user = findUserById(message.getSenderId());
+                    User user = senderMap.get(message.getSenderId());
+//                    var user = findUserById(message.getSenderId());
                     return messageResponseMapper.mapToMessageResponse(message, user);
                 })
                 .collect(Collectors.toList());
