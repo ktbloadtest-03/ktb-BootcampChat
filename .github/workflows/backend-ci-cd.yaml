@@ -65,6 +65,10 @@ jobs:
 
       - name: Build and Push Docker Image
         run: |
+          # application.properties 생성 (Base64 디코딩)
+          echo "${{ secrets.APPLICATION_PROPERTIES }}" | base64 -d > apps/backend/src/main/resources/application.properties
+          echo "application.properties created."
+
           # 브랜치명과 SHA로 태그 결정
           if [ "${{ github.ref }}" == "refs/heads/main" ]; then
             IMAGE_TAG="main-${{ github.sha }}"
@@ -186,38 +190,38 @@ jobs:
             # Docker Hub 로그인
             echo "🔐 Logging in to Docker Hub..."
             echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin || true
-            
+          
             # Docker 이미지 pull
             echo "📥 Pulling Docker image..."
             docker pull ${IMAGE_NAME}
           
             # 기존 컨테이너 정리 - 개선된 로직
             echo "🛑 Stopping and removing existing containers..."
-            
+          
             # 메인 컨테이너 찾기 (정확한 이름 매칭)
             MAIN_CONTAINER=$(docker ps -a --filter "name=^ktb-chat-backend$" --format "{{.ID}}" | head -1)
-            
+          
             if [ -n "$MAIN_CONTAINER" ]; then
               echo "📦 Found main container: ${MAIN_CONTAINER}"
-              
+          
               # 실행 중이면 중지
               if docker ps --format "{{.ID}}" | grep -q "^${MAIN_CONTAINER}$"; then
                 echo "  Stopping container..."
                 docker stop ${MAIN_CONTAINER} 2>/dev/null || true
                 sleep 2
               fi
-              
+          
               # 백업으로 이름 변경
               BACKUP_NAME="ktb-chat-backend-backup-$(date +%s)"
               echo "  Renaming to backup: ${BACKUP_NAME}"
               docker rename ${MAIN_CONTAINER} ${BACKUP_NAME} 2>/dev/null || true
-              
+          
               # 백업 컨테이너 제거 (이미 이름이 변경되었으므로)
               docker rm -f ${BACKUP_NAME} 2>/dev/null || true
             else
               echo "  No main container found"
             fi
-            
+          
             # 혹시 남아있을 수 있는 모든 ktb-chat-backend 컨테이너 강제 정리
             echo "🧹 Force cleaning any remaining containers..."
             REMAINING_CONTAINERS=$(docker ps -a --filter "name=ktb-chat-backend" --format "{{.ID}}" || true)
