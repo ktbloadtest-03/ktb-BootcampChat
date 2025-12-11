@@ -1,5 +1,6 @@
 package com.ktb.chatapp.service;
 
+import com.ktb.chatapp.cache.RoomCacheStore;
 import com.ktb.chatapp.dto.*;
 import com.ktb.chatapp.event.RoomCreatedEvent;
 import com.ktb.chatapp.event.RoomUpdatedEvent;
@@ -16,6 +17,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -33,6 +35,7 @@ public class RoomService {
     private final MessageRepository messageRepository;
     private final PasswordEncoder passwordEncoder;
     private final ApplicationEventPublisher eventPublisher;
+    private final RoomCacheStore roomCacheStore;
 
     public RoomsResponse getAllRoomsWithPagination(
             com.ktb.chatapp.dto.PageRequest pageRequest, String name) {
@@ -184,6 +187,7 @@ public class RoomService {
         return roomRepository.findById(roomId);
     }
 
+    //@CacheEvict
     public Room joinRoom(String roomId, String password, String name) {
         Optional<Room> roomOpt = roomRepository.findById(roomId);
         if (roomOpt.isEmpty()) {
@@ -206,6 +210,7 @@ public class RoomService {
             // 채팅방 참여
             room.getParticipantIds().add(user.getId());
             room = roomRepository.save(room);
+            roomCacheStore.evictRoom(roomId);
         }
         
         // Publish event for room updated

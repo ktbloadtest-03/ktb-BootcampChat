@@ -3,6 +3,7 @@ package com.ktb.chatapp.websocket.socketio.handler;
 import com.corundumstudio.socketio.SocketIOClient;
 import com.corundumstudio.socketio.SocketIOServer;
 import com.corundumstudio.socketio.annotation.OnEvent;
+import com.ktb.chatapp.cache.RoomCacheStore;
 import com.ktb.chatapp.dto.MarkAsReadRequest;
 import com.ktb.chatapp.dto.MessagesReadResponse;
 import com.ktb.chatapp.model.Message;
@@ -36,6 +37,7 @@ public class MessageReadHandler {
     private final MessageRepository messageRepository;
     private final RoomRepository roomRepository;
     private final UserRepository userRepository;
+    private final RoomCacheStore roomCacheStore;
     
     @OnEvent(MARK_MESSAGES_AS_READ)
     public void handleMarkAsRead(SocketIOClient client, MarkAsReadRequest data) {
@@ -65,6 +67,7 @@ public class MessageReadHandler {
             }
 
             Room room = roomRepository.findById(roomId).orElse(null);
+//            Room room = roomCacheStore.getRoom(roomId);
             if (room == null || !room.getParticipantIds().contains(userId)) {
                 client.sendEvent(ERROR, Map.of("message", "Room access denied"));
                 return;
