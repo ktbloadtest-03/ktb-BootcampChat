@@ -110,7 +110,7 @@ jobs:
       matrix:
         # 서버 식별자 리스트 - 새로운 서버 추가 시 여기에만 추가하면 됨
         server: [be, server2, server3, server4, server5, server6, server7, server8, server9, server10, server11, server12]
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
