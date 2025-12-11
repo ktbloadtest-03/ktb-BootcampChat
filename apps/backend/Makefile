@@ -240,7 +240,7 @@ o11y-restart: o11y-down o11y-up
 deploy-o11y:
 	@echo "📦 Deploying monitoring stack to remote servers..."
 	@echo "  → Deploying to ktb-o11y..."
-	ssh ktb-o11y "mkdir -p ~/o11y"
+	ssh -i "loadtest-keypair.pem" root@ec2-43-202-6-139.ap-northeast-2.compute.amazonaws.com "mkdir -p ~/o11y"
 	rsync -avz --delete monitoring $(COMPOSE_O11Y_FILE) ktb-o11y:~/o11y/
 	@echo ""
 	@echo "⚠️  IMPORTANT: Update .env file on remote server with production values!"

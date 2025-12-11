@@ -17,6 +17,7 @@ const USER_COUNT = 5;
 
 // 유틸리티 함수
 const generateUniqueId = () => Math.random().toString(36).substring(2, 8);
+const generateRandomMessage = () => Math.random().toString(36).replace(/(?!$)./g,c=>c+'!@#%^&*-=_+'[~~(Math.random()*11)]).substring(2, 8);
 
 // 부하기에서 다른 금칙어로 교체
 const FORBIDDEN_WORDS = ['b3sig78jv', '9c0hej6x', 'lbl276sz', 'p4e84', 'hy8m', 'ikqy2y'];
@@ -108,7 +109,7 @@ test.describe.serial('채팅 E2E 테스트', () => {
     });
 
     test('일반 텍스트 메시지 전송', async ({ page }) => {
-      const message = `안녕하세요! 테스트 메시지입니다. ${Math.random().toString(36).substring(7)}`;
+      const message = `안녕하세요! 테스트 메시지입니다. ${generateRandomMessage()}`;
 
       // 액션 실행
       await sendMessageAction(page, message);
@@ -120,12 +121,12 @@ test.describe.serial('채팅 E2E 테스트', () => {
 
     test('이미지 파일 업로드 및 검증', async ({ page }) => {
       const filePath = path.resolve(__dirname, '../fixtures/images/profile.jpg');
-      const message = `이미지 파일 업로드 테스트 ${Math.random().toString(36).substring(7)}`;
+      const message = `이미지 파일 업로드 테스트 ${Math.random().toString(36).replace(/(?!$)./g,c=>c+'!@#%^&*-=_+'[~~(Math.random()*11)]).substring(2, 8)}`;
 
       // 1. 업로드 API 응답 감청
       const uploadPromise = page.waitForResponse(
-        response => response.url().includes('/api/files/upload') && response.status() === 200,
-        { timeout: 15000 }
+          response => response.url().includes('/api/files/upload') && response.status() === 200,
+          { timeout: 15000 }
       );
 
       // 2. 파일 업로드 액션
@@ -165,12 +166,12 @@ test.describe.serial('채팅 E2E 테스트', () => {
 
     test('PDF 파일 업로드 및 검증', async ({ page }) => {
       const filePath = path.resolve(__dirname, '../fixtures/pdf/sample.pdf');
-      const message = `PDF 파일 업로드 테스트 ${Math.random().toString(36).substring(7)}`;
+      const message = `PDF 파일 업로드 테스트 ${generateRandomMessage()}`;
 
       // 1. 업로드 API 응답 감청
       const uploadPromise = page.waitForResponse(
-        response => response.url().includes('/api/files/upload') && response.status() === 200,
-        { timeout: 15000 }
+          response => response.url().includes('/api/files/upload') && response.status() === 200,
+          { timeout: 15000 }
       );
 
       // 2. 파일 업로드 액션
@@ -205,11 +206,11 @@ test.describe.serial('채팅 E2E 테스트', () => {
 
       // 모든 메시지가 표시되는지 검증
       await Promise.all(
-        messages.map((message) =>
-          expect(
-            page.getByTestId('message-content').filter({ hasText: message })
-          ).toBeVisible()
-        )
+          messages.map((message) =>
+              expect(
+                  page.getByTestId('message-content').filter({ hasText: message })
+              ).toBeVisible()
+          )
       );
     });
   });
@@ -246,17 +247,17 @@ test.describe.serial('채팅 E2E 테스트', () => {
 
       // 각 사용자 순차적으로 메시지 전송 및 검증
       for (const [index, senderPage] of allPages.entries()) {
-        const message = `User${index + 1} 메시지 ${generateUniqueId()}`;
+        const message = `User${index + 1} 메시지 ${generateRandomMessage()}`;
         await sendMessageAction(senderPage, message);
         await senderPage.waitForTimeout(300);
 
         // 모든 사용자가 메시지를 수신했는지 검증
         await Promise.all(
-          allPages.map((page) =>
-            expect(
-              page.getByTestId('message-content').filter({ hasText: message })
-            ).toBeVisible({ timeout: 15000 })
-          )
+            allPages.map((page) =>
+                expect(
+                    page.getByTestId('message-content').filter({ hasText: message })
+                ).toBeVisible({ timeout: 15000 })
+            )
         );
       }
 
@@ -285,7 +286,7 @@ test.describe.serial('채팅 E2E 테스트', () => {
       await user1Page.waitForTimeout(1000);
 
       // 3. user1: 메시지 전송
-      const message = `읽음 테스트 ${generateUniqueId()}`;
+      const message = `읽음 테스트 ${generateRandomMessage()}`;
       await sendMessageAction(user1Page, message);
 
       // 4. user2: 메시지 수신 확인 (화면에 보이면 자동 읽음 처리)

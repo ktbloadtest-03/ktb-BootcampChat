@@ -18,6 +18,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.context.annotation.Role;
+import com.corundumstudio.socketio.Transport;
 
 import static org.springframework.beans.factory.config.BeanDefinition.ROLE_INFRASTRUCTURE;
 
@@ -52,6 +53,10 @@ public class SocketIOConfig {
         config.setPingTimeout(60000);
         config.setPingInterval(25000);
         config.setUpgradeTimeout(10000);
+        // FIX: 백엔드 socket 에러 로그
+        config.setTransports(Transport.POLLING, Transport.WEBSOCKET);
+
+
 
         config.setJsonSupport(new JacksonJsonSupport(new JavaTimeModule()));
         config.setStoreFactory(new MemoryStoreFactory()); // 단일노드 전용
@@ -82,4 +87,5 @@ public class SocketIOConfig {
     public ChatDataStore chatDataStore() {
         return new LocalChatDataStore();
     }
+
 }
