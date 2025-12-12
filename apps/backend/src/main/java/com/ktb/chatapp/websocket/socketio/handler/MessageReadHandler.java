@@ -9,11 +9,14 @@ import com.ktb.chatapp.dto.MessagesReadResponse;
 import com.ktb.chatapp.model.Message;
 import com.ktb.chatapp.model.Room;
 import com.ktb.chatapp.model.User;
+import com.ktb.chatapp.rabbitmq.RabbitPublisher;
 import com.ktb.chatapp.repository.MessageRepository;
 import com.ktb.chatapp.repository.RoomRepository;
 import com.ktb.chatapp.repository.UserRepository;
 import com.ktb.chatapp.service.MessageReadStatusService;
 import com.ktb.chatapp.websocket.socketio.SocketUser;
+
+import java.util.ArrayList;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +41,7 @@ public class MessageReadHandler {
     private final RoomRepository roomRepository;
     private final UserRepository userRepository;
     private final RoomCacheStore roomCacheStore;
+    private final RabbitPublisher rabbitPublisher;
     
     @OnEvent(MARK_MESSAGES_AS_READ)
     public void handleMarkAsRead(SocketIOClient client, MarkAsReadRequest data) {
@@ -78,8 +82,10 @@ public class MessageReadHandler {
             MessagesReadResponse response = new MessagesReadResponse(userId, data.getMessageIds());
 
             // Broadcast to room
-            socketIOServer.getRoomOperations(roomId)
-                    .sendEvent(MESSAGES_READ, response);
+//            socketIOServer.getRoomOperations(roomId)
+//                    .sendEvent(MESSAGES_READ, response);
+
+            rabbitPublisher.markAsRead(new ArrayList<>(room.getParticipantIds()), response);
 
         } catch (Exception e) {
             log.error("Error handling markMessagesAsRead", e);

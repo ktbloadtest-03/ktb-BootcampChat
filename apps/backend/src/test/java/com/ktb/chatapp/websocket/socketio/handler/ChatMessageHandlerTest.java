@@ -6,6 +6,7 @@ import com.ktb.chatapp.cache.RoomCacheStore;
 import com.ktb.chatapp.dto.ChatMessageRequest;
 import com.ktb.chatapp.model.Room;
 import com.ktb.chatapp.model.User;
+import com.ktb.chatapp.rabbitmq.RabbitPublisher;
 import com.ktb.chatapp.repository.FileRepository;
 import com.ktb.chatapp.repository.MessageRepository;
 import com.ktb.chatapp.repository.RoomRepository;
@@ -58,6 +59,8 @@ class ChatMessageHandlerTest {
     private RateLimitService rateLimitService;
     @Mock
     private RoomCacheStore roomCacheStore;
+    @Mock
+    private RabbitPublisher rabbitPublisher;
     private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     private ChatMessageHandler handler;
@@ -76,7 +79,8 @@ class ChatMessageHandlerTest {
                 bannedWordChecker,
                 rateLimitService,
                 meterRegistry,
-                roomCacheStore
+                roomCacheStore,
+                rabbitPublisher
             );
     }
 

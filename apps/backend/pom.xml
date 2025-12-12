@@ -163,6 +163,17 @@
             <scope>runtime</scope>
             <optional>true</optional>
         </dependency>
+        <!-- Spring AMQP RabbitMQ -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+
+        <!-- 메시지를 JSON 형태로 직렬화하려면 (선택) -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
