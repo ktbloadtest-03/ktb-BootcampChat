@@ -34,14 +34,14 @@ public class S3Service {
         return getPreSignedUrl(FILE_FOLDER, fileId);
     }
 
-    @Async
+
     public String putFile(MultipartFile file, String fileId) throws IOException {
         PutObjectRequest objectRequest = putObjectRequest(file, FILE_FOLDER, fileId);
         s3Client.putObject(objectRequest, RequestBody.fromBytes(file.getBytes()));
         return s3Client.utilities().getUrl(builder -> builder.bucket(s3Properties.bucket()).key(String.join("/", FILE_FOLDER))).toExternalForm();
     }
 
-    @Async
+
     public void deleteFile(String fileId) {
         DeleteObjectRequest objectRequest = deleteObjectRequest(FILE_FOLDER, fileId);
         s3Client.deleteObject(objectRequest);
