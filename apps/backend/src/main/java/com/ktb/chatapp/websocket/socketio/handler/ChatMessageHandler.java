@@ -55,6 +55,7 @@ public class ChatMessageHandler {
     
     @OnEvent(CHAT_MESSAGE)
     public void handleChatMessage(SocketIOClient client, ChatMessageRequest data) {
+        log.info("handleChatMessage =>");
         Timer.Sample timerSample = Timer.start(meterRegistry);
 
         if (data == null) {
