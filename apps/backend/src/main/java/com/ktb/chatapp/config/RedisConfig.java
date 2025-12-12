@@ -96,14 +96,16 @@ public class RedisConfig {
 
         // 캐시 이름 설정 담아주기
         Map<String, RedisCacheConfiguration> redisCacheConfigurationMap = new HashMap<>();
-        redisCacheConfigurationMap.put("UserCache", redisCacheConfiguration);
-        redisCacheConfigurationMap.put("UserDetailCache", redisCacheConfiguration);
+        redisCacheConfigurationMap.put("user::email", redisCacheConfiguration);
+        redisCacheConfigurationMap.put("RoomCache", redisCacheConfiguration);
+        redisCacheConfigurationMap.put("userIp", redisCacheConfiguration);
 
         // RedisCacheManager 리턴
         return RedisCacheManager.RedisCacheManagerBuilder
             .fromConnectionFactory(redisConnectionFactory)  // Redis 연결 설정
             .cacheDefaults(redisCacheConfiguration)  // 기본 캐시 설정
             .withInitialCacheConfigurations(redisCacheConfigurationMap)  // 초기 캐시 설정을 맵으로 전달
+            .enableStatistics()
             .build();  // RedisCacheManager 생성
     }
 }

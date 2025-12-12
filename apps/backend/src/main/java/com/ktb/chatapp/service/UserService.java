@@ -4,6 +4,7 @@ import com.ktb.chatapp.cache.UserCacheStore;
 import com.ktb.chatapp.dto.ProfileImageResponse;
 import com.ktb.chatapp.dto.UpdateProfileRequest;
 import com.ktb.chatapp.dto.UserResponse;
+import com.ktb.chatapp.model.File;
 import com.ktb.chatapp.model.User;
 import com.ktb.chatapp.repository.UserRepository;
 import com.ktb.chatapp.util.FileUtil;
@@ -88,11 +89,13 @@ public class UserService {
 
         // 기존 프로필 이미지 삭제
         if (user.getProfileImage() != null && !user.getProfileImage().isEmpty()) {
-            deleteOldProfileImage(user.getProfileImage());
+            fileService.deleteFileWithPath(user.getProfileImage(), user.getId());
         }
 
         // 새 파일 저장 (보안 검증 포함)
-        String profileImageUrl = fileService.storeFile(file, "profiles");
+        File uploadFile = fileService.uploadFile(file, user.getId()).getFile();
+        String profileImageUrl = uploadFile.getPath();
+
 
         userCacheStore.evictUserByEmail(email);
 
@@ -184,7 +187,7 @@ public class UserService {
         if (user.getProfileImage() != null && !user.getProfileImage().isEmpty()) {
             userCacheStore.evictUserByEmail(email);
 
-            deleteOldProfileImage(user.getProfileImage());
+            fileService.deleteFileWithPath(user.getProfileImage(), user.getId());
             user.setProfileImage("");
             user.setUpdatedAt(LocalDateTime.now());
             userRepository.save(user);
@@ -202,7 +205,7 @@ public class UserService {
         User user = userCacheStore.getUserByEmail(email);
 
         if (user.getProfileImage() != null && !user.getProfileImage().isEmpty()) {
-            deleteOldProfileImage(user.getProfileImage());
+            fileService.deleteFileWithPath(user.getProfileImage(), user.getId());
         }
 
         userCacheStore.evictUserByEmail(email);

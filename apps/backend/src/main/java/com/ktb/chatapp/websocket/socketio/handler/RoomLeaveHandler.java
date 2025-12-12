@@ -3,6 +3,7 @@ package com.ktb.chatapp.websocket.socketio.handler;
 import com.corundumstudio.socketio.SocketIOClient;
 import com.corundumstudio.socketio.SocketIOServer;
 import com.corundumstudio.socketio.annotation.OnEvent;
+import com.ktb.chatapp.cache.IpCacheStore;
 import com.ktb.chatapp.cache.RoomCacheStore;
 import com.ktb.chatapp.dto.MessageResponse;
 import com.ktb.chatapp.dto.UserResponse;
@@ -10,6 +11,7 @@ import com.ktb.chatapp.model.Message;
 import com.ktb.chatapp.model.MessageType;
 import com.ktb.chatapp.model.Room;
 import com.ktb.chatapp.model.User;
+import com.ktb.chatapp.rabbitmq.RabbitPublisher;
 import com.ktb.chatapp.repository.MessageRepository;
 import com.ktb.chatapp.repository.RoomRepository;
 import com.ktb.chatapp.repository.UserRepository;
@@ -45,6 +47,8 @@ public class RoomLeaveHandler {
     private final UserRooms userRooms;
     private final MessageResponseMapper messageResponseMapper;
     private final RoomCacheStore roomCacheStore;
+    private final IpCacheStore ipCacheStore;
+    private final RabbitPublisher rabbitPublisher;
     
     @OnEvent(LEAVE_ROOM)
     public void handleLeaveRoom(SocketIOClient client, String roomId) {
@@ -72,6 +76,7 @@ public class RoomLeaveHandler {
 
             roomCacheStore.evictRoom(roomId);
             roomRepository.removeParticipant(roomId, userId);
+            ipCacheStore.removeIp(userId);
 
             client.leaveRoom(roomId);
             userRooms.remove(userId, roomId);
@@ -82,11 +87,16 @@ public class RoomLeaveHandler {
             
             sendSystemMessage(roomId, userName + "님이 퇴장하였습니다.");
             broadcastParticipantList(roomId);
-            socketIOServer.getRoomOperations(roomId)
-                    .sendEvent(USER_LEFT, Map.of(
-                            "userId", userId,
-                            "userName", userName
-                    ));
+//            socketIOServer.getRoomOperations(roomId)
+//                    .sendEvent(USER_LEFT, Map.of(
+//                            "userId", userId,
+//                            "userName", userName
+//                    ));
+            rabbitPublisher.leaveRoom(new ArrayList<>(room.getParticipantIds()), Map.of(
+                "userId", userId,
+                "userName", userName
+            ));
+
             
         } catch (Exception e) {
             log.error("Error handling leaveRoom", e);
@@ -110,8 +120,10 @@ public class RoomLeaveHandler {
             Message savedMessage = messageRepository.save(systemMessage);
             MessageResponse response = messageResponseMapper.mapToMessageResponse(savedMessage, null);
 
-            socketIOServer.getRoomOperations(roomId)
-                    .sendEvent(MESSAGE, response);
+//            socketIOServer.getRoomOperations(roomId)
+//                    .sendEvent(MESSAGE, response);
+            Room room = roomRepository.findById(roomId).orElse(null);
+            rabbitPublisher.sendMessage(new ArrayList<>(room.getParticipantIds()), response);
 
         } catch (Exception e) {
             log.error("Error sending system message", e);
@@ -137,8 +149,9 @@ public class RoomLeaveHandler {
             return;
         }
         
-        socketIOServer.getRoomOperations(roomId)
-                .sendEvent(PARTICIPANTS_UPDATE, participantList);
+//        socketIOServer.getRoomOperations(roomId)
+//                .sendEvent(PARTICIPANTS_UPDATE, participantList);
+        rabbitPublisher.updateParticipants(new ArrayList<>(roomOpt.get().getParticipantIds()), participantList);
     }
 
     private SocketUser getUserDto(SocketIOClient client) {
