@@ -1,5 +1,6 @@
 package com.ktb.chatapp.service.session;
 
+import com.ktb.chatapp.cache.SessionCacheStore;
 import com.ktb.chatapp.model.Session;
 import com.ktb.chatapp.repository.SessionRepository;
 import java.util.Optional;
@@ -13,12 +14,12 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class SessionMongoStore implements SessionStore {
-    
     private final SessionRepository sessionRepository;
+    private final SessionCacheStore sessionCacheStore;
     
     @Override
     public Optional<Session> findByUserId(String userId) {
-        return sessionRepository.findByUserId(userId);
+        return Optional.ofNullable(sessionCacheStore.getSession(userId));
     }
     
     @Override
@@ -28,14 +29,14 @@ public class SessionMongoStore implements SessionStore {
     
     @Override
     public void delete(String userId, String sessionId) {
-        Session session = sessionRepository.findByUserId(userId).orElse(null);
+        Session session = sessionCacheStore.getSession(userId);
         if (session != null && sessionId.equals(session.getSessionId())) {
-            sessionRepository.delete(session);
+            sessionCacheStore.evictSession(userId);
         }
     }
     
     @Override
     public void deleteAll(String userId) {
-        sessionRepository.deleteByUserId(userId);
+        sessionCacheStore.evictSession(userId);
     }
 }
