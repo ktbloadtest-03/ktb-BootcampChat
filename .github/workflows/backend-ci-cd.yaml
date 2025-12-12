@@ -65,6 +65,10 @@ jobs:
 
       - name: Build and Push Docker Image
         run: |
+          # application.properties 생성 (Base64 디코딩)
+          echo "${{ secrets.APPLICATION_PROPERTIES }}" | base64 -d > apps/backend/src/main/resources/application.properties
+          echo "application.properties created."
+
           # 브랜치명과 SHA로 태그 결정
           if [ "${{ github.ref }}" == "refs/heads/main" ]; then
             IMAGE_TAG="main-${{ github.sha }}"
@@ -105,7 +109,7 @@ jobs:
       fail-fast: false  # 한 서버 실패해도 다른 서버 배포는 계속 진행
       matrix:
         # 서버 식별자 리스트 - 새로운 서버 추가 시 여기에만 추가하면 됨
-        server: [be, server2]
+        server: [be, server2, server3, server4, server5, server6, server7, server8, server9, server10, server11, server12]
     
     steps:
       - name: Checkout code
@@ -125,6 +129,26 @@ jobs:
             SERVER_HOST="${{ secrets.SERVER_HOST_BE }}"
           elif [ "${{ matrix.server }}" == "server2" ]; then
             SERVER_HOST="${{ secrets.SERVER_HOST_2 }}"
+                    elif [ "${{ matrix.server }}" == "server3" ]; then
+            SERVER_HOST="${{ secrets.SERVER_HOST_3 }}"
+          elif [ "${{ matrix.server }}" == "server4" ]; then
+            SERVER_HOST="${{ secrets.SERVER_HOST_4 }}"
+          elif [ "${{ matrix.server }}" == "server5" ]; then
+            SERVER_HOST="${{ secrets.SERVER_HOST_5 }}"
+          elif [ "${{ matrix.server }}" == "server6" ]; then
+            SERVER_HOST="${{ secrets.SERVER_HOST_6 }}"
+          elif [ "${{ matrix.server }}" == "server7" ]; then
+            SERVER_HOST="${{ secrets.SERVER_HOST_7 }}"
+          elif [ "${{ matrix.server }}" == "server8" ]; then
+            SERVER_HOST="${{ secrets.SERVER_HOST_8 }}"
+          elif [ "${{ matrix.server }}" == "server9" ]; then
+            SERVER_HOST="${{ secrets.SERVER_HOST_9 }}"
+          elif [ "${{ matrix.server }}" == "server10" ]; then
+            SERVER_HOST="${{ secrets.SERVER_HOST_10 }}"
+          elif [ "${{ matrix.server }}" == "server11" ]; then
+            SERVER_HOST="${{ secrets.SERVER_HOST_11 }}"
+          elif [ "${{ matrix.server }}" == "server12" ]; then
+            SERVER_HOST="${{ secrets.SERVER_HOST_12 }}"
           else
             echo "Unknown server: ${{ matrix.server }}"
             exit 1
@@ -186,38 +210,38 @@ jobs:
             # Docker Hub 로그인
             echo "🔐 Logging in to Docker Hub..."
             echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin || true
-            
+          
             # Docker 이미지 pull
             echo "📥 Pulling Docker image..."
             docker pull ${IMAGE_NAME}
           
             # 기존 컨테이너 정리 - 개선된 로직
             echo "🛑 Stopping and removing existing containers..."
-            
+          
             # 메인 컨테이너 찾기 (정확한 이름 매칭)
             MAIN_CONTAINER=$(docker ps -a --filter "name=^ktb-chat-backend$" --format "{{.ID}}" | head -1)
-            
+          
             if [ -n "$MAIN_CONTAINER" ]; then
               echo "📦 Found main container: ${MAIN_CONTAINER}"
-              
+          
               # 실행 중이면 중지
               if docker ps --format "{{.ID}}" | grep -q "^${MAIN_CONTAINER}$"; then
                 echo "  Stopping container..."
                 docker stop ${MAIN_CONTAINER} 2>/dev/null || true
                 sleep 2
               fi
-              
+          
               # 백업으로 이름 변경
               BACKUP_NAME="ktb-chat-backend-backup-$(date +%s)"
               echo "  Renaming to backup: ${BACKUP_NAME}"
               docker rename ${MAIN_CONTAINER} ${BACKUP_NAME} 2>/dev/null || true
-              
+          
               # 백업 컨테이너 제거 (이미 이름이 변경되었으므로)
               docker rm -f ${BACKUP_NAME} 2>/dev/null || true
             else
               echo "  No main container found"
             fi
-            
+          
             # 혹시 남아있을 수 있는 모든 ktb-chat-backend 컨테이너 강제 정리
             echo "🧹 Force cleaning any remaining containers..."
             REMAINING_CONTAINERS=$(docker ps -a --filter "name=ktb-chat-backend" --format "{{.ID}}" || true)
@@ -243,8 +267,19 @@ jobs:
             MONGO_ENV="mongodb://43.203.48.10:27017/bootcamp-chat"
             REDIS_IP="43.200.29.6"
             REDIS_PORT="6379"
-          
-            echo "🚀 Starting new container..."
+            
+            # EC2 Public IP (IMDSv2)
+            TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" \
+              -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+              
+            SERVER_PUBLIC_IP=$(curl -s \
+              -H "X-aws-ec2-metadata-token: ${TOKEN}" \
+              http://169.254.169.254/latest/meta-data/public-ipv4)
+              
+            echo "SERVER_PUBLIC_IP=${SERVER_PUBLIC_IP}"
+
+
+          echo "🚀 Starting new container..."
             docker run -d \
             --name ktb-chat-backend \
             --restart unless-stopped \
@@ -252,6 +287,7 @@ jobs:
             -p 5002:5002 \
             -e "socketio.server.host=0.0.0.0" \
             -e "socketio.server.port=5002" \
+            -e SERVER_IP=${SERVER_PUBLIC_IP} \
             ${CORS_ENV} \
             -e JWT_SECRET=${JWT_ENV} \
             -e MONGO_URI=${MONGO_ENV} \
