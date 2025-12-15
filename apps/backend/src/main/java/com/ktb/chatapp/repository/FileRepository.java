@@ -9,6 +9,6 @@ import java.util.Optional;
 @Repository
 public interface FileRepository extends MongoRepository<File, String> {
     Optional<File> findByOriginalname(String filename);
-
+    Optional<File> findByFilename(String filename);
     Optional<File> findByPath(String path);
 }
