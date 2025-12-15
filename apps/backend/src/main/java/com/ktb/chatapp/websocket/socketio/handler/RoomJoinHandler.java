@@ -38,8 +38,6 @@ import static com.ktb.chatapp.websocket.socketio.SocketIOEvents.*;
 public class RoomJoinHandler {
 
     private final ChatRedisPublisher chatRedisPublisher;
-    @Value("${server_ip}")
-    private String serverIp;
 
     private final SocketIOServer socketIOServer;
     private final MessageRepository messageRepository;
@@ -51,7 +49,6 @@ public class RoomJoinHandler {
     private final RoomLeaveHandler roomLeaveHandler;
     private final RoomCacheStore roomCacheStore;
 
-    private final IpCacheStore ipCacheStore;
     private final RabbitPublisher rabbitPublisher;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -97,7 +94,6 @@ public class RoomJoinHandler {
             // Join socket room and add to user's room set
             client.joinRoom(roomId);
             userRooms.add(userId, roomId);
-            ipCacheStore.saveIp(userId, serverIp);
 
             Message joinMessage = Message.builder()
                     .roomId(roomId)
