@@ -7,7 +7,7 @@ import com.ktb.chatapp.event.AiMessageStartEvent;
 import com.ktb.chatapp.model.AiType;
 import com.ktb.chatapp.model.Message;
 import com.ktb.chatapp.model.MessageType;
-import com.ktb.chatapp.repository.MessageRepository;
+import com.ktb.chatapp.message.repository.MessageRepository;
 import com.ktb.chatapp.websocket.socketio.handler.StreamingSession;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;

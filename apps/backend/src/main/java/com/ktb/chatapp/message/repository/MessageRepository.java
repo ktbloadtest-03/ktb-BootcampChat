@@ -1,4 +1,4 @@
-package com.ktb.chatapp.repository;
+package com.ktb.chatapp.message.repository;
 
 import com.ktb.chatapp.model.Message;
 import java.time.LocalDateTime;
