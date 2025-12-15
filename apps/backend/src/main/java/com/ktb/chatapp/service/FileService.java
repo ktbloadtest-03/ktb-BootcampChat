@@ -13,6 +13,6 @@ public interface FileService {
 
     boolean deleteFile(String fileId, String requesterId);
 
-    boolean deleteFileWithPath(String path, String requesterId);
+    boolean deleteByPath(String id, String requesterId);
 }
 

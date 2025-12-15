@@ -89,7 +89,7 @@ public class UserService {
 
         // 기존 프로필 이미지 삭제
         if (user.getProfileImage() != null && !user.getProfileImage().isEmpty()) {
-            fileService.deleteFileWithPath(user.getProfileImage(), user.getId());
+            fileService.deleteByPath(user.getProfileImage(), user.getId());
         }
 
         // 새 파일 저장 (보안 검증 포함)
@@ -187,7 +187,7 @@ public class UserService {
         if (user.getProfileImage() != null && !user.getProfileImage().isEmpty()) {
             userCacheStore.evictUserByEmail(email);
 
-            fileService.deleteFileWithPath(user.getProfileImage(), user.getId());
+            fileService.deleteByPath(user.getProfileImage(), user.getId());
             user.setProfileImage("");
             user.setUpdatedAt(LocalDateTime.now());
             userRepository.save(user);
@@ -205,7 +205,7 @@ public class UserService {
         User user = userCacheStore.getUserByEmail(email);
 
         if (user.getProfileImage() != null && !user.getProfileImage().isEmpty()) {
-            fileService.deleteFileWithPath(user.getProfileImage(), user.getId());
+            fileService.deleteByPath(user.getProfileImage(), user.getId());
         }
 
         userCacheStore.evictUserByEmail(email);

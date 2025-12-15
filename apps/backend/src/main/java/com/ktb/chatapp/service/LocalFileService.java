@@ -77,8 +77,8 @@ public class LocalFileService implements FileService {
                     .uploadDate(LocalDateTime.now())
                     .build();
 
-            String fileEntityPath = s3Service.putFile(file, fileEntity.getId());
-            fileEntity.setPath(fileEntityPath);
+            String fileFolderPath = s3Service.putFile(file, fileEntity.getId());
+            fileEntity.setPath(fileFolderPath+"/"+ fileEntity.getId());
 
             File savedFile = fileRepository.save(fileEntity);
 
@@ -201,7 +201,7 @@ public class LocalFileService implements FileService {
     }
 
     @Override
-    public boolean deleteFileWithPath(String path, String requesterId) {
+    public boolean deleteByPath(String path, String requesterId) {
         try{
             File fileEntity = fileRepository.findByPath(path)
                     .orElseThrow(() -> new RuntimeException("파일을 찾을 수 없습니다."));

@@ -38,8 +38,7 @@ public class S3Service {
     public String putFile(MultipartFile file, String fileId) throws IOException {
         PutObjectRequest objectRequest = putObjectRequest(file, FILE_FOLDER, fileId);
         s3Client.putObject(objectRequest, RequestBody.fromBytes(file.getBytes()));
-        String fileFolder =  s3Client.utilities().getUrl(builder -> builder.bucket(s3Properties.bucket()).key(String.join("/", FILE_FOLDER))).toExternalForm();
-        return fileFolder+"/"+fileId;
+        return s3Client.utilities().getUrl(builder -> builder.bucket(s3Properties.bucket()).key(String.join("/", FILE_FOLDER))).toExternalForm();
     }
 
 

@@ -120,10 +120,7 @@ public class FileController {
         @ApiResponse(responseCode = "500", description = "서버 내부 오류",
             content = @Content(schema = @Schema(implementation = StandardResponse.class)))
     })
-    @GetMapping(value = "/download/{filename:.+}", consumes = {
-            MediaType.MULTIPART_FORM_DATA_VALUE,
-            MediaType.APPLICATION_JSON_VALUE
-    })
+    @GetMapping(value = "/download/{filename:.+}")
     public ResponseEntity<?> downloadFile(
         @Parameter(description = "다운로드할 파일명") @PathVariable String filename,
         HttpServletRequest request,
