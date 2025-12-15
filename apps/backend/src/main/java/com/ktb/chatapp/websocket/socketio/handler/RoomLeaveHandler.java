@@ -7,11 +7,13 @@ import com.ktb.chatapp.cache.IpCacheStore;
 import com.ktb.chatapp.cache.RoomCacheStore;
 import com.ktb.chatapp.dto.MessageResponse;
 import com.ktb.chatapp.dto.UserResponse;
+import com.ktb.chatapp.event.RedisBroadcastEvent;
 import com.ktb.chatapp.model.Message;
 import com.ktb.chatapp.model.MessageType;
 import com.ktb.chatapp.model.Room;
 import com.ktb.chatapp.model.User;
 import com.ktb.chatapp.rabbitmq.RabbitPublisher;
+import com.ktb.chatapp.redis.ChatRedisPublisher;
 import com.ktb.chatapp.repository.MessageRepository;
 import com.ktb.chatapp.repository.RoomRepository;
 import com.ktb.chatapp.repository.UserRepository;
@@ -26,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 import static com.ktb.chatapp.websocket.socketio.SocketIOEvents.*;
@@ -49,7 +52,9 @@ public class RoomLeaveHandler {
     private final RoomCacheStore roomCacheStore;
     private final IpCacheStore ipCacheStore;
     private final RabbitPublisher rabbitPublisher;
-    
+    private final ChatRedisPublisher chatRedisPublisher;
+    private final ApplicationEventPublisher eventPublisher;
+
     @OnEvent(LEAVE_ROOM)
     public void handleLeaveRoom(SocketIOClient client, String roomId) {
         try {
@@ -87,17 +92,14 @@ public class RoomLeaveHandler {
             
             sendSystemMessage(roomId, userName + "님이 퇴장하였습니다.");
             broadcastParticipantList(roomId);
-//            socketIOServer.getRoomOperations(roomId)
-//                    .sendEvent(USER_LEFT, Map.of(
-//                            "userId", userId,
-//                            "userName", userName
-//                    ));
-            rabbitPublisher.leaveRoom(new ArrayList<>(room.getParticipantIds()), Map.of(
+            Map<String, String> userInfo = Map.of(
                 "userId", userId,
                 "userName", userName
-            ));
-
-            
+            );
+            socketIOServer.getRoomOperations(roomId)
+                    .sendEvent(USER_LEFT, userInfo);
+//            chatRedisPublisher.publish(roomId, USER_LEFT, userInfo);
+            eventPublisher.publishEvent(RedisBroadcastEvent.of(roomId, USER_LEFT, userInfo));
         } catch (Exception e) {
             log.error("Error handling leaveRoom", e);
             client.sendEvent(ERROR, Map.of("message", "채팅방 퇴장 중 오류가 발생했습니다."));
@@ -120,10 +122,13 @@ public class RoomLeaveHandler {
             Message savedMessage = messageRepository.save(systemMessage);
             MessageResponse response = messageResponseMapper.mapToMessageResponse(savedMessage, null);
 
-//            socketIOServer.getRoomOperations(roomId)
-//                    .sendEvent(MESSAGE, response);
-            Room room = roomRepository.findById(roomId).orElse(null);
-            rabbitPublisher.sendMessage(new ArrayList<>(room.getParticipantIds()), response);
+            socketIOServer.getRoomOperations(roomId)
+                    .sendEvent(MESSAGE, response);
+//            chatRedisPublisher.publish(roomId, MESSAGE, response);
+            eventPublisher.publishEvent(RedisBroadcastEvent.of(roomId, MESSAGE, response));
+//            Room room = roomRepository.findById(roomId).orElse(null);
+//            rabbitPublisher.sendChatEvent(roomId, new ArrayList<>(room.getParticipantIds()), response);
+//            rabbitPublisher.sendMessage(new ArrayList<>(room.getParticipantIds()), response);
 
         } catch (Exception e) {
             log.error("Error sending system message", e);
@@ -149,9 +154,10 @@ public class RoomLeaveHandler {
             return;
         }
         
-//        socketIOServer.getRoomOperations(roomId)
-//                .sendEvent(PARTICIPANTS_UPDATE, participantList);
-        rabbitPublisher.updateParticipants(new ArrayList<>(roomOpt.get().getParticipantIds()), participantList);
+        socketIOServer.getRoomOperations(roomId)
+                .sendEvent(PARTICIPANTS_UPDATE, participantList);
+//        chatRedisPublisher.publish(roomId, PARTICIPANTS_UPDATE, participantList);
+        eventPublisher.publishEvent(RedisBroadcastEvent.of(roomId, PARTICIPANTS_UPDATE, participantList));
     }
 
     private SocketUser getUserDto(SocketIOClient client) {
