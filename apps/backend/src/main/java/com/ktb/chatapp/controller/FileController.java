@@ -132,7 +132,7 @@ public class FileController {
 
             Resource resource = fileService.loadFileAsResource(filename, user.getId());
 
-            File fileEntity = fileRepository.findByOriginalname(filename)
+            File fileEntity = fileRepository.findByFilename(filename)
                 .orElse(null);
 
             String originalFilename = fileEntity != null ? fileEntity.getOriginalname() : filename;
@@ -206,7 +206,7 @@ public class FileController {
 
             Resource resource = fileService.loadFileAsResource(filename, user.getId());
 
-            File fileEntity = fileRepository.findByOriginalname(filename)
+            File fileEntity = fileRepository.findByFilename(filename)
                 .orElseThrow(() -> new RuntimeException("파일을 찾을 수 없습니다."));
 
             if (!fileEntity.isPreviewable()) {
