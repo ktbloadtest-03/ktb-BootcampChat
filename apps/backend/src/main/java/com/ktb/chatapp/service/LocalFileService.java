@@ -142,7 +142,7 @@ public class LocalFileService implements FileService {
     public Resource loadFileAsResource(String fileName, String requesterId) {
         try {
             // 1. 파일 조회
-            File fileEntity = fileRepository.findByOriginalname(fileName)
+            File fileEntity = fileRepository.findByFilename(fileName)
                     .orElseThrow(() -> new RuntimeException("파일을 찾을 수 없습니다: " + fileName));
 
             // 2. 메시지 조회 (파일과 메시지 연결 확인) - 효율적인 쿼리 메서드 사용
