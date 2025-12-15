@@ -9,8 +9,10 @@ import com.ktb.chatapp.dto.FileResponse;
 import com.ktb.chatapp.dto.MessageContent;
 import com.ktb.chatapp.dto.MessageResponse;
 import com.ktb.chatapp.dto.UserResponse;
+import com.ktb.chatapp.event.RedisBroadcastEvent;
 import com.ktb.chatapp.model.*;
 import com.ktb.chatapp.rabbitmq.RabbitPublisher;
+import com.ktb.chatapp.redis.ChatRedisPublisher;
 import com.ktb.chatapp.repository.FileRepository;
 import com.ktb.chatapp.repository.MessageRepository;
 import com.ktb.chatapp.repository.RoomRepository;
@@ -31,6 +33,7 @@ import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 import static com.ktb.chatapp.websocket.socketio.SocketIOEvents.*;
@@ -52,10 +55,11 @@ public class ChatMessageHandler {
     private final MeterRegistry meterRegistry;
     private final RoomCacheStore roomCacheStore;
     private final RabbitPublisher rabbitPublisher;
+    private final ChatRedisPublisher chatRedisPublisher;
+    private final ApplicationEventPublisher eventPublisher;
     
     @OnEvent(CHAT_MESSAGE)
     public void handleChatMessage(SocketIOClient client, ChatMessageRequest data) {
-        log.info("handleChatMessage =>");
         Timer.Sample timerSample = Timer.start(meterRegistry);
 
         if (data == null) {
@@ -167,10 +171,11 @@ public class ChatMessageHandler {
 
             Message savedMessage = messageRepository.save(message);
 
-            // FIXME: MQ로 전송할 부분
-//            socketIOServer.getRoomOperations(roomId)
-//                    .sendEvent(MESSAGE, createMessageResponse(savedMessage, sender));
-            rabbitPublisher.sendMessage(new ArrayList<>(room.getParticipantIds()), createMessageResponse(savedMessage, sender));
+            MessageResponse messageResponse = createMessageResponse(savedMessage, sender);
+            socketIOServer.getRoomOperations(roomId)
+                    .sendEvent(MESSAGE, messageResponse);
+//            chatRedisPublisher.publish(roomId, MESSAGE, messageResponse);
+            eventPublisher.publishEvent(RedisBroadcastEvent.of(roomId, MESSAGE, messageResponse));
 
             // AI 멘션 처리 -> 필요한가?
             aiService.handleAIMentions(roomId, socketUser.id(), messageContent);

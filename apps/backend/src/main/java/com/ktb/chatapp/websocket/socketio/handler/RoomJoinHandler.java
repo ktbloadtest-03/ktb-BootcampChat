@@ -5,27 +5,26 @@ import com.corundumstudio.socketio.SocketIOServer;
 import com.corundumstudio.socketio.annotation.OnEvent;
 import com.ktb.chatapp.cache.IpCacheStore;
 import com.ktb.chatapp.cache.RoomCacheStore;
-import com.ktb.chatapp.dto.FetchMessagesRequest;
-import com.ktb.chatapp.dto.FetchMessagesResponse;
-import com.ktb.chatapp.dto.JoinRoomSuccessResponse;
-import com.ktb.chatapp.dto.UserResponse;
+import com.ktb.chatapp.dto.*;
+import com.ktb.chatapp.event.RedisBroadcastEvent;
 import com.ktb.chatapp.model.Message;
 import com.ktb.chatapp.model.MessageType;
 import com.ktb.chatapp.model.Room;
 import com.ktb.chatapp.rabbitmq.RabbitPublisher;
+import com.ktb.chatapp.redis.ChatRedisPublisher;
 import com.ktb.chatapp.repository.MessageRepository;
 import com.ktb.chatapp.repository.RoomRepository;
 import com.ktb.chatapp.repository.UserRepository;
 import com.ktb.chatapp.websocket.socketio.SocketUser;
 import com.ktb.chatapp.websocket.socketio.UserRooms;
 
-import java.net.InetSocketAddress;
 import java.time.LocalDateTime;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 import static com.ktb.chatapp.websocket.socketio.SocketIOEvents.*;
@@ -40,6 +39,7 @@ import static com.ktb.chatapp.websocket.socketio.SocketIOEvents.*;
 @RequiredArgsConstructor
 public class RoomJoinHandler {
 
+    private final ChatRedisPublisher chatRedisPublisher;
     @Value("${server_ip}")
     private String serverIp;
     private final SocketIOServer socketIOServer;
@@ -53,6 +53,7 @@ public class RoomJoinHandler {
     private final RoomCacheStore roomCacheStore;
     private final IpCacheStore ipCacheStore;
     private final RabbitPublisher rabbitPublisher;
+    private final ApplicationEventPublisher eventPublisher;
 
     @OnEvent(JOIN_ROOM)
     public void handleJoinRoom(SocketIOClient client, String roomId) {
@@ -79,16 +80,6 @@ public class RoomJoinHandler {
             if (userRooms.isInRoom(userId, roomId)) {
                 log.debug("User {} already in room {}", userId, roomId);
                 client.joinRoom(roomId);
-
-                InetSocketAddress remoteAddress = (InetSocketAddress) client.getRemoteAddress();
-                if (remoteAddress == null) {
-                    log.info("remote address null");
-                }
-                if(remoteAddress != null) {
-                    log.info("remote address {}", serverIp);
-                    ipCacheStore.saveIp(userId, serverIp);
-                }
-
                 client.sendEvent(JOIN_ROOM_SUCCESS, Map.of("roomId", roomId));
                 return;
             }
@@ -97,14 +88,10 @@ public class RoomJoinHandler {
             roomRepository.addParticipant(roomId, userId);
             roomCacheStore.evictRoom(roomId);
 
-
             // Join socket room and add to user's room set
             client.joinRoom(roomId);
             userRooms.add(userId, roomId);
-            InetSocketAddress remoteAddress = (InetSocketAddress) client.getRemoteAddress();
-            if(remoteAddress != null) {
-                ipCacheStore.saveIp(userId, serverIp);
-            }
+            ipCacheStore.saveIp(userId, serverIp);
 
             Message joinMessage = Message.builder()
                 .roomId(roomId)
@@ -151,19 +138,17 @@ public class RoomJoinHandler {
             client.sendEvent(JOIN_ROOM_SUCCESS, response);
 
             // 입장 메시지 브로드캐스트
-//            socketIOServer.getRoomOperations(roomId)
-//               .sendEvent(MESSAGE, messageResponseMapper.mapToMessageResponse(joinMessage, null));
-//            rabbitPublisher.
-            Room room = roomOpt.get();
-            List<String> participantIds = new ArrayList<>(room.getParticipantIds());
-            rabbitPublisher.joinRoom(participantIds, messageResponseMapper.mapToMessageResponse(joinMessage, null));
-
+            MessageResponse messageResponse = messageResponseMapper.mapToMessageResponse(joinMessage, null);
+            socketIOServer.getRoomOperations(roomId)
+               .sendEvent(MESSAGE, messageResponse);
+//            chatRedisPublisher.publish(roomId, MESSAGE, messageResponse);
+            eventPublisher.publishEvent(RedisBroadcastEvent.of(roomId, MESSAGE, messageResponse));
 
             // 참가자 목록 업데이트 브로드캐스트
-//            socketIOServer.getRoomOperations(roomId)
-//                .sendEvent(PARTICIPANTS_UPDATE, participants);
-
-            rabbitPublisher.updateParticipants(participantIds, participants);
+            socketIOServer.getRoomOperations(roomId)
+                .sendEvent(PARTICIPANTS_UPDATE, participants);
+//            chatRedisPublisher.publish(roomId, PARTICIPANTS_UPDATE, participants);
+            eventPublisher.publishEvent(RedisBroadcastEvent.of(roomId, PARTICIPANTS_UPDATE, participants));
 
             log.info("User {} joined room {} successfully. Message count: {}, hasMore: {}",
                 userName, roomId, messageLoadResult.getMessages().size(), messageLoadResult.isHasMore());
