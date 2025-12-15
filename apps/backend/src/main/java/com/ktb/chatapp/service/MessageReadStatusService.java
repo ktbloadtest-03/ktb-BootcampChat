@@ -1,14 +1,13 @@
 package com.ktb.chatapp.service;
 
 import com.ktb.chatapp.model.Message;
-import com.ktb.chatapp.repository.MessageRepository;
+import com.ktb.chatapp.message.repository.MessageRepository;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
-import com.mongodb.client.result.UpdateResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -20,11 +19,18 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class MessageReadStatusService {
 
     private final MessageRepository messageRepository;
-    private final MongoTemplate mongoTemplate;
+    @Qualifier("messageMongoTemplate")
+    private final MongoTemplate messageMongoTemplate;
+
+    public MessageReadStatusService(
+        MessageRepository messageRepository,
+        @Qualifier("messageMongoTemplate") MongoTemplate messageMongoTemplate) {
+        this.messageRepository = messageRepository;
+        this.messageMongoTemplate = messageMongoTemplate;
+    }
 
     /**
      * 메시지 읽음 상태 업데이트
@@ -46,7 +52,7 @@ public class MessageReadStatusService {
             Query query = new Query(Criteria.where("id").in(messageIds)
                 .and("readers.userId").ne(userId));
             Update update = new Update().addToSet("readers").each(readerInfo);
-            mongoTemplate.updateMulti(query, update, Message.class);
+            messageMongoTemplate.updateMulti(query, update, Message.class);
 
 //            List<Message> messages = new ArrayList<>();
 //            List<Message> messagesToUpdate = messageRepository.findAllById(messageIds);

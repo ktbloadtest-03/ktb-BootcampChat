@@ -11,7 +11,7 @@ import com.ktb.chatapp.model.MessageType;
 import com.ktb.chatapp.model.Room;
 import com.ktb.chatapp.rabbitmq.RabbitPublisher;
 import com.ktb.chatapp.redis.ChatRedisPublisher;
-import com.ktb.chatapp.repository.MessageRepository;
+import com.ktb.chatapp.message.repository.MessageRepository;
 import com.ktb.chatapp.repository.RoomRepository;
 import com.ktb.chatapp.repository.UserRepository;
 import com.ktb.chatapp.websocket.socketio.SocketUser;
