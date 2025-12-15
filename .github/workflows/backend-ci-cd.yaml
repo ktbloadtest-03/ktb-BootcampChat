@@ -129,7 +129,7 @@ jobs:
             SERVER_HOST="${{ secrets.SERVER_HOST_BE }}"
           elif [ "${{ matrix.server }}" == "server2" ]; then
             SERVER_HOST="${{ secrets.SERVER_HOST_2 }}"
-                    elif [ "${{ matrix.server }}" == "server3" ]; then
+          elif [ "${{ matrix.server }}" == "server3" ]; then
             SERVER_HOST="${{ secrets.SERVER_HOST_3 }}"
           elif [ "${{ matrix.server }}" == "server4" ]; then
             SERVER_HOST="${{ secrets.SERVER_HOST_4 }}"
