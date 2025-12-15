@@ -66,7 +66,7 @@ jobs:
       - name: Build and Push Docker Image
         run: |
           # application.properties 생성 (Base64 디코딩)
-          echo "${{ secrets.APPLICATION_PROPERTIES }}" | base64 -d > apps/backend/src/main/resources/application.properties
+          echo "${{ secrets.APPLICATION_PROPERTIES_TEST }}" | base64 -d > apps/backend/src/main/resources/application.properties
           echo "application.properties created."
 
           # 브랜치명과 SHA로 태그 결정
@@ -265,6 +265,7 @@ jobs:
             # JWT 시크릿 환경 변수 설정 및 Mongo URI 설정
             JWT_ENV="d7689060b5bc059a5661401c72f820614ed942d15e4aa928b633e60f1e17cef9"
             MONGO_ENV="mongodb://43.203.48.10:27017/bootcamp-chat"
+            MONGO_CHAT_ENV="mongodb://13.124.243.88:27017/bootcamp-chat"
             REDIS_IP="43.200.29.6"
             REDIS_PORT="6379"
             
@@ -290,7 +291,8 @@ jobs:
             -e SERVER_IP=${SERVER_PUBLIC_IP} \
             ${CORS_ENV} \
             -e JWT_SECRET=${JWT_ENV} \
-            -e MONGO_URI=${MONGO_ENV} \
+            -e MONGO_PRIMARY_URI=${MONGO_ENV} \
+            -e MONGO_MESSAGE_URI=${MONGO_CHAT_ENV} \
             -e REDIS_HOST=${REDIS_IP} \
             -e REDIS_PORT=${REDIS_PORT} \
             ${IMAGE_NAME}
