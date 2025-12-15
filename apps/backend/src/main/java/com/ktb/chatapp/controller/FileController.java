@@ -59,7 +59,10 @@ public class FileController {
         @ApiResponse(responseCode = "500", description = "서버 내부 오류",
             content = @Content(schema = @Schema(implementation = StandardResponse.class)))
     })
-    @PostMapping("/upload")
+    @PostMapping(value = "/upload", consumes = {
+            MediaType.MULTIPART_FORM_DATA_VALUE,
+            MediaType.APPLICATION_JSON_VALUE
+    })
     public ResponseEntity<?> uploadFile(
         @Parameter(description = "업로드할 파일") @RequestParam("file") MultipartFile file,
         Principal principal) {
@@ -118,7 +121,10 @@ public class FileController {
         @ApiResponse(responseCode = "500", description = "서버 내부 오류",
             content = @Content(schema = @Schema(implementation = StandardResponse.class)))
     })
-    @GetMapping("/download/{filename:.+}")
+    @GetMapping(value = "/download/{filename:.+}", consumes = {
+            MediaType.MULTIPART_FORM_DATA_VALUE,
+            MediaType.APPLICATION_JSON_VALUE
+    })
     public ResponseEntity<?> downloadFile(
         @Parameter(description = "다운로드할 파일명") @PathVariable String filename,
         HttpServletRequest request,
@@ -192,7 +198,10 @@ public class FileController {
         return ResponseEntity.status(statusCode).body(errorResponse);
     }
 
-    @GetMapping("/view/{filename:.+}")
+    @GetMapping(value = "/view/{filename:.+}", consumes = {
+            MediaType.MULTIPART_FORM_DATA_VALUE,
+            MediaType.APPLICATION_JSON_VALUE
+    })
     public ResponseEntity<?> viewFile(
         @PathVariable String filename,
         HttpServletRequest request,
@@ -240,7 +249,10 @@ public class FileController {
         }
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping(value= "/{id}", consumes = {
+            MediaType.MULTIPART_FORM_DATA_VALUE,
+            MediaType.APPLICATION_JSON_VALUE
+    })
     public ResponseEntity<?> deleteFile(@PathVariable String id, Principal principal) {
         try {
             //            User user = userRepository.findByEmail(principal.getName())
