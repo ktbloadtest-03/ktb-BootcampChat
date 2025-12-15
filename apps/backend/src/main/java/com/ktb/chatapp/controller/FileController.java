@@ -194,10 +194,7 @@ public class FileController {
         return ResponseEntity.status(statusCode).body(errorResponse);
     }
 
-    @GetMapping(value = "/view/{filename:.+}", consumes = {
-            MediaType.MULTIPART_FORM_DATA_VALUE,
-            MediaType.APPLICATION_JSON_VALUE
-    })
+    @GetMapping(value = "/view/{filename:.+}")
     public ResponseEntity<?> viewFile(
         @PathVariable String filename,
         HttpServletRequest request,
