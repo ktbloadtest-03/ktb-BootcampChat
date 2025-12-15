@@ -14,7 +14,7 @@ import com.ktb.chatapp.model.*;
 import com.ktb.chatapp.rabbitmq.RabbitPublisher;
 import com.ktb.chatapp.redis.ChatRedisPublisher;
 import com.ktb.chatapp.repository.FileRepository;
-import com.ktb.chatapp.repository.MessageRepository;
+import com.ktb.chatapp.message.repository.MessageRepository;
 import com.ktb.chatapp.repository.RoomRepository;
 import com.ktb.chatapp.repository.UserRepository;
 import com.ktb.chatapp.util.BannedWordChecker;

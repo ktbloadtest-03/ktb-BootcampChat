@@ -27,7 +27,7 @@ public class ChatRedisSubscriber {
         try {
             ChatBroadcastMessage msg = objectMapper.readValue(message, ChatBroadcastMessage.class);
             if (SERVER_ID.equals(msg.serverId())) return;
-            Object payload = objectMapper.readValue(msg.payloadJson(), getClassByMessageType(msg.event())); // 구조를 모르면 Object, 알면 DTO로 변환
+            Object payload = objectMapper.readValue(msg.payloadJson(), Object.class); // 구조를 모르면 Object, 알면 DTO로 변환
             socketIOServer.getRoomOperations(msg.roomId()).sendEvent(msg.event(), payload);
         } catch (Exception e) {
             log.error(e.getMessage(), e);
