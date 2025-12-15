@@ -6,18 +6,24 @@ import com.corundumstudio.socketio.annotation.OnEvent;
 import com.ktb.chatapp.cache.RoomCacheStore;
 import com.ktb.chatapp.dto.MarkAsReadRequest;
 import com.ktb.chatapp.dto.MessagesReadResponse;
+import com.ktb.chatapp.event.RedisBroadcastEvent;
 import com.ktb.chatapp.model.Message;
 import com.ktb.chatapp.model.Room;
 import com.ktb.chatapp.model.User;
+import com.ktb.chatapp.rabbitmq.RabbitPublisher;
+import com.ktb.chatapp.redis.ChatRedisPublisher;
 import com.ktb.chatapp.repository.MessageRepository;
 import com.ktb.chatapp.repository.RoomRepository;
 import com.ktb.chatapp.repository.UserRepository;
 import com.ktb.chatapp.service.MessageReadStatusService;
 import com.ktb.chatapp.websocket.socketio.SocketUser;
+
+import java.util.ArrayList;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 import static com.ktb.chatapp.websocket.socketio.SocketIOEvents.*;
@@ -38,6 +44,9 @@ public class MessageReadHandler {
     private final RoomRepository roomRepository;
     private final UserRepository userRepository;
     private final RoomCacheStore roomCacheStore;
+    private final RabbitPublisher rabbitPublisher;
+    private final ChatRedisPublisher chatRedisPublisher;
+    private final ApplicationEventPublisher eventPublisher;
     
     @OnEvent(MARK_MESSAGES_AS_READ)
     public void handleMarkAsRead(SocketIOClient client, MarkAsReadRequest data) {
@@ -67,7 +76,6 @@ public class MessageReadHandler {
             }
 
             Room room = roomRepository.findById(roomId).orElse(null);
-//            Room room = roomCacheStore.getRoom(roomId);
             if (room == null || !room.getParticipantIds().contains(userId)) {
                 client.sendEvent(ERROR, Map.of("message", "Room access denied"));
                 return;
@@ -80,7 +88,8 @@ public class MessageReadHandler {
             // Broadcast to room
             socketIOServer.getRoomOperations(roomId)
                     .sendEvent(MESSAGES_READ, response);
-
+//            chatRedisPublisher.publish(roomId, MESSAGES_READ, response);
+            eventPublisher.publishEvent(RedisBroadcastEvent.of(roomId, MESSAGES_READ, response));
         } catch (Exception e) {
             log.error("Error handling markMessagesAsRead", e);
             client.sendEvent(ERROR, Map.of(

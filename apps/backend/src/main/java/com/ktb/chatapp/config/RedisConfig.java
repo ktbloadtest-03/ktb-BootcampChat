@@ -6,7 +6,10 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.ktb.chatapp.redis.ChatRedisPublisher;
+import com.ktb.chatapp.redis.ChatRedisSubscriber;
 import io.lettuce.core.api.StatefulConnection;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.EnableCaching;
@@ -21,6 +24,10 @@ import org.springframework.data.redis.connection.lettuce.LettuceClientConfigurat
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.connection.lettuce.LettucePoolingClientConfiguration;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.listener.ChannelTopic;
+import org.springframework.data.redis.listener.RedisMessageListenerContainer;
+import org.springframework.data.redis.listener.adapter.MessageListenerAdapter;
 import org.springframework.data.redis.repository.configuration.EnableRedisRepositories;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
@@ -29,16 +36,41 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @Configuration
 @EnableCaching
 @EnableRedisRepositories
+@RequiredArgsConstructor
 public class RedisConfig {
     @Value("${spring.data.redis.host}")
     private String host;
 
     @Value("${spring.data.redis.port}")
     private int port;
+
+    private final ObjectMapper objectMapper;
+    public static final String CHANNEL = "chat:broadcast";
+    public static final String SERVER_ID = UUID.randomUUID().toString();
+
+    @Bean
+    public ChatRedisPublisher chatRedisPublisher(StringRedisTemplate stringRedisTemplate) {
+        return new ChatRedisPublisher(stringRedisTemplate, objectMapper);
+    }
+    @Bean
+    public RedisMessageListenerContainer listenerContainer(
+        RedisConnectionFactory connectionFactory,
+        MessageListenerAdapter chatListener) {
+        RedisMessageListenerContainer container = new RedisMessageListenerContainer();
+        container.setConnectionFactory(connectionFactory);
+        container.addMessageListener(chatListener, new ChannelTopic(CHANNEL));
+        return container;
+    }
+
+    @Bean
+    public MessageListenerAdapter messageListenerAdapter(ChatRedisSubscriber subscriber) {
+        return new MessageListenerAdapter(subscriber, "onMessage");
+    }
 
     @Bean
     public RedisConnectionFactory redisConnectionFactory(){

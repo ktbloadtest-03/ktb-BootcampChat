@@ -1,5 +1,6 @@
 package com.ktb.chatapp.controller;
 
+import com.ktb.chatapp.dto.MessageResponse;
 import com.ktb.chatapp.dto.StandardResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -11,6 +12,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -54,5 +56,10 @@ public class MessageController {
         return ResponseEntity.status(500).body(
                 StandardResponse.error("미구현.")
         );
+    }
+
+    @PostMapping("/new")
+    public void createNewMessage(@RequestBody MessageResponse messageResponse) {
+        log.info("Consumer REST API called - returning new message {}", messageResponse.getContent());
     }
 }
