@@ -15,11 +15,10 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class SessionMongoStore implements SessionStore {
     private final SessionRepository sessionRepository;
-    private final SessionCacheStore sessionCacheStore;
     
     @Override
     public Optional<Session> findByUserId(String userId) {
-        return Optional.ofNullable(sessionCacheStore.getSession(userId));
+        return sessionRepository.findByUserId(userId);
     }
     
     @Override
@@ -29,14 +28,14 @@ public class SessionMongoStore implements SessionStore {
     
     @Override
     public void delete(String userId, String sessionId) {
-        Session session = sessionCacheStore.getSession(userId);
-        if (session != null && sessionId.equals(session.getSessionId())) {
-            sessionCacheStore.evictSession(userId);
+        Optional<Session> session = sessionRepository.findByUserId(userId);
+        if(session.isPresent()) {
+            sessionRepository.deleteByUserId(userId);
         }
     }
     
     @Override
     public void deleteAll(String userId) {
-        sessionCacheStore.evictSession(userId);
+        sessionRepository.deleteByUserId(userId);
     }
 }
